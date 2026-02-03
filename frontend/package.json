@@ -13,6 +13,7 @@
     "@react-google-maps/api": "^2.20.8",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.13.4",
     "lucide-react": "^0.563.0",
     "mapbox-gl": "^3.18.1",
     "postcss": "^8.5.6",

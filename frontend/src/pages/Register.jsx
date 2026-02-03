@@ -55,22 +55,15 @@ const Register = () => {
     try {
       const payload = {
         username: formData.username,
-        email: formData.email,
+        emailid: formData.email,
         password: formData.password,
       };
 
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/register/`,
-        payload
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/register`,
+        payload,
+        { withCredentials: true },
       );
-
-      const { token, user } = response.data;
-      const { access, refresh } = token;
-      const { username } = user;
-
-      localStorage.setItem("accessToken", access);
-      localStorage.setItem("refreshToken", refresh);
-      localStorage.setItem("username", username);
 
       toast.success("User registered successfully!", {
         position: "top-right",
@@ -79,8 +72,9 @@ const Register = () => {
 
       navigate("/dashboard");
     } catch (error) {
+      console.log(error.response);
       toast.error(
-        error.response?.data?.error || "Registration failed. Please try again."
+        error.response?.data?.error || "Registration failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -182,7 +176,11 @@ const Register = () => {
               disabled={loading}
               className="w-full bg-blue-600 text-white py-2 rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              {loading ? <Loader2 className="animate-spin" size={18} /> : "Register"}
+              {loading ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                "Register"
+              )}
             </button>
           </form>
 
