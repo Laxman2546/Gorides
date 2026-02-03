@@ -14,7 +14,8 @@ const App = () => {
 
       <Route path="/r" element={<GoRidesLanding />} />
       
-      
+
+      <Route path="/dashboard" element={<Dashboard />} />
     </Routes>
   );
 };
