@@ -31,17 +31,12 @@ const Login = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}api/login/`,
-        formData
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/login`,
+        formData,
+        { withCredentials: true },
       );
       const data = response.data;
-      const { token, user } = data;
-      const { access, refresh } = token;
-      const { username,  id } = user;
-
-      localStorage.setItem("accessToken", access);
-      localStorage.setItem("refreshToken", refresh);
-      localStorage.setItem("username", username);
+      console.log(data);
 
       toast.success("Login successful ", {
         position: "top-center",
@@ -50,6 +45,7 @@ const Login = () => {
 
       navigate("/dashboard");
     } catch (error) {
+      console.log(error.response);
       if (error.response) {
         toast.error(error.response.data?.detail || "Invalid credentials ", {
           position: "top-center",
@@ -64,10 +60,9 @@ const Login = () => {
     }
   };
 
-
-  const navtoReg=()=>{
-    navigate('/register');
-  }
+  const navtoReg = () => {
+    navigate("/register");
+  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row relative">
@@ -151,12 +146,14 @@ const Login = () => {
 
           <p className="text-center text-gray-600 mt-6 text-sm">
             Don’t have an account?{" "}
-            <button onClick={navtoReg}><a
-              href=""
-              className="text-blue-600 font-semibold hover:underline"
-            >
-              Register here
-            </a></button>
+            <button onClick={navtoReg}>
+              <a
+                href=""
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                Register here
+              </a>
+            </button>
           </p>
         </div>
       </div>
