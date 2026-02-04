@@ -4,6 +4,7 @@ import http from "http";
 import userRoute from "./src/routes/userRoute.js";
 import mapsRoute from "./src/routes/mapsRoute.js";
 import adminRoute from "./src/routes/adminRoute.js";
+import captainRoute from "./src/routes/captainRoute.js";
 import { connectDb } from "./src/config/db.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -24,6 +25,7 @@ app.get("/", (req, res) => {
 app.use("/auth", userRoute);
 app.use("/maps", mapsRoute);
 app.use("/admin", adminRoute);
+app.use("/captain", captainRoute);
 const port = process.env.PORT || 3001;
 server.listen(port, () => {
   console.log(`server is running ${port}`);

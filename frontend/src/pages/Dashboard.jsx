@@ -24,12 +24,12 @@ export default function GoRidesLanding() {
   const [routeCache, setRouteCache] = useState({});
 
   // USER
+  const [captainData, setCaptainData] = useState(null);
   const [user, setUser] = useState({
     name: "Guest User",
     phone: "",
     emailid: "",
     emailVerifed: false,
-    dlVerified: false,
     vehicle: { name: "", number: "" },
   });
 
@@ -48,7 +48,6 @@ export default function GoRidesLanding() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpInput, setOtpInput] = useState("");
 
-  const captainStatus = user.dlVerified ? "approved" : "pending";
   const navigate = useNavigate();
 
   // GOOGLE MAPS LOADER
@@ -143,9 +142,11 @@ export default function GoRidesLanding() {
         name: data.username || prevUser.name,
         emailid: data.emailid || prevUser.emailid,
         phone: data.phone || prevUser.phone,
-        emailVerifed: data.isEmailVerified || prevUser.emailVerifed,
-        dlVerified: data.dlVerified || prevUser.dlVerified,
+        emailVerifed: data.isEmailVerified,
       }));
+      if (data.captain) {
+        setCaptainData(data.captain);
+      }
     } catch (e) {
       console.error("Error fetching user data:", e);
       if (e.response?.status === 401) {
@@ -187,7 +188,7 @@ export default function GoRidesLanding() {
   };
 
   const publishRide = () => {
-    if (captainStatus !== "approved")
+    if (captainData?.status !== "approved")
       return toast.error("Captain must be approved before creating rides");
 
     if (!fromCity || !toCity)
@@ -289,6 +290,43 @@ export default function GoRidesLanding() {
       toast.error("Error verifying OTP: " + error.message);
     }
   };
+  const handleCaptainApproval = () => {
+    if (!dlNumber) {
+      toast.error("please enter your licence Number");
+      return;
+    }
+    if (!user.vehicle.name) {
+      toast.error("please enter your vehicle name");
+      return;
+    }
+    if (!user.vehicle.number) {
+      toast.error("please enter your vehicle number");
+      return;
+    }
+    createCaptain();
+  };
+  const vehiclePayload = {
+    vehicleName: user.vehicle.name,
+    vehicleNumber: user.vehicle.number,
+    dlNumber,
+  };
+  const createCaptain = async () => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/captain/create`,
+        vehiclePayload,
+        {
+          withCredentials: true,
+        },
+      );
+      console.log(response.data);
+      toast.success("Captain created successfully,will be verified soon");
+      getUserData();
+    } catch (e) {
+      console.log(e.response);
+      toast.error(e.response.data.error || "Error creating captain");
+    }
+  };
 
   return (
     <>
@@ -357,7 +395,7 @@ export default function GoRidesLanding() {
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-gray-500">
-                    Captain status: {captainStatus}
+                    Captain status: {captainData?.status || "Not a captain"}
                   </p>
 
                   <input
@@ -573,51 +611,66 @@ export default function GoRidesLanding() {
                   Captain Verification (Optional)
                 </h3>
 
-                <input
-                  className="w-full px-4 py-2 rounded-full border"
-                  placeholder="Driving License Number"
-                  value={dlNumber}
-                  onChange={(e) => setDlNumber(e.target.value)}
-                />
+                {captainData ? (
+                  <div>
+                    <p>
+                      Your application status is:{" "}
+                      <b className="capitalize">{captainData.status}</b>
+                    </p>
+                    {captainData.status === "declined" && (
+                      <p className="text-sm text-red-500">
+                        Your application was declined. Please contact support
+                        for more information.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      className="w-full px-4 py-2 rounded-full border"
+                      placeholder="Driving License Number"
+                      value={dlNumber}
+                      onChange={(e) => setDlNumber(e.target.value)}
+                    />
 
-                <input
-                  className="w-full px-4 py-2 rounded-full border"
-                  placeholder="Vehicle Name"
-                  value={user.vehicle.name}
-                  onChange={(e) =>
-                    setUser({
-                      ...user,
-                      vehicle: {
-                        ...user.vehicle,
-                        name: e.target.value,
-                      },
-                    })
-                  }
-                />
+                    <input
+                      className="w-full px-4 py-2 rounded-full border"
+                      placeholder="Vehicle Name"
+                      value={user.vehicle.name}
+                      onChange={(e) =>
+                        setUser({
+                          ...user,
+                          vehicle: {
+                            ...user.vehicle,
+                            name: e.target.value,
+                          },
+                        })
+                      }
+                    />
 
-                <input
-                  className="w-full px-4 py-2 rounded-full border"
-                  placeholder="Vehicle Number"
-                  value={user.vehicle.number}
-                  onChange={(e) =>
-                    setUser({
-                      ...user,
-                      vehicle: {
-                        ...user.vehicle,
-                        number: e.target.value,
-                      },
-                    })
-                  }
-                />
+                    <input
+                      className="w-full px-4 py-2 rounded-full border"
+                      placeholder="Vehicle Number"
+                      value={user.vehicle.number}
+                      onChange={(e) =>
+                        setUser({
+                          ...user,
+                          vehicle: {
+                            ...user.vehicle,
+                            number: e.target.value,
+                          },
+                        })
+                      }
+                    />
 
-                <button
-                  className="w-full bg-blue-500 text-white py-2 rounded-full"
-                  onClick={() =>
-                    toast.success("Captain verification submitted 🚀")
-                  }
-                >
-                  Submit for Captain Approval
-                </button>
+                    <button
+                      className="w-full bg-blue-500 text-white py-2 rounded-full"
+                      onClick={() => handleCaptainApproval()}
+                    >
+                      Submit for Captain Approval
+                    </button>
+                  </>
+                )}
 
                 <div className="mt-10 flex justify-center">
                   <button

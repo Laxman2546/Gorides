@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import captianModel from "../models/captainModel.js";
 export const createUser = async (req, res) => {
   const { username, emailid, password } = req.body;
   if (!username || !emailid || !password) {
@@ -158,7 +159,12 @@ export const getUserData = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "user not found" });
     }
-    return res.status(200).json(user);
+    const captain = await captianModel.findOne({ userId: user._id });
+    const userData = {
+      ...user.toObject(),
+      captain: captain ? captain.toObject() : null,
+    };
+    return res.status(200).json(userData);
   } catch (e) {
     console.log(e, "error while getting user data");
     return res.status(500).json({ error: "error while getting user data" });
