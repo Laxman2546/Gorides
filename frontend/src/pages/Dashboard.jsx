@@ -1,55 +1,22 @@
-// import React from "react";
-// import { useNavigate } from "react-router-dom";
-// import axios from "axios";
-
-// const Dashboard = () => {
-//   const navigate = useNavigate();
-//   const handleLogout = async () => {
-//     try {
-//       const response = await axios.get(
-//         `${import.meta.env.VITE_BACKEND_URL}/auth/api/logout`,
-//       );
-//       if (response.status === 200) {
-//         navigate("/");
-//         localStorage.clear();
-//       }
-//     } catch (e) {
-//       console.log(e, "error while logging out");
-//     }
-//   };
-//   return (
-//     <>
-//       <button
-//         className="p-3 bg-red-500 rounded-2xl text-white"
-//         onClick={handleLogout}
-//       >
-//         Logout
-//       </button>
-//     </>
-//   );
-// };
-
-// export default Dashboard;
-
 import React, { useState, useEffect } from "react";
-import { LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { LogOut } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { all } from "axios";
 
-const navigate=useNavigate()
-// ==============================
-// CONFIG
-// ==============================
-// IMPORTANT:
-// If this is empty, maps will gracefully fallback to a placeholder UI
-// to avoid Google Maps API errors in dev/sandbox environments.
-const GOOGLE_MAPS_KEY = ""; // <-- Put your real key here in production
 
-export default function Dashboard() {
+// // ==============================
+// // CONFIG
+// // ==============================
+// // IMPORTANT:
+// // If this is empty, maps will gracefully fallback to a placeholder UI
+// to avoid Google Maps API errors in dev/sandbox environments.
+const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8"; // <-- Put your real key here in production
+
+export default function GoRidesLanding() {
+  
 
   
   const [screen, setScreen] = useState("home");
@@ -59,7 +26,8 @@ export default function Dashboard() {
   const [user, setUser] = useState({
     name: "Guest User",
     phone: "",
-    phoneVerified: false,
+    emailid: "",
+    emailVerifed: false,
     dlVerified: false,
     vehicle: { name: "", number: "" },
   });
@@ -73,10 +41,9 @@ export default function Dashboard() {
   const [seats, setSeats] = useState(1);
   const [date, setDate] = useState("");
 
-  // OTP STATE (MOCK)
+  // OTP STATE
   const [otpSent, setOtpSent] = useState(false);
   const [otpInput, setOtpInput] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
 
   const captainStatus = user.dlVerified ? "approved" : "pending";
 
@@ -86,7 +53,7 @@ export default function Dashboard() {
   const { isLoaded } = useJsApiLoader(
     shouldLoadMaps
       ? { googleMapsApiKey: GOOGLE_MAPS_KEY }
-      : { googleMapsApiKey: "" }
+      : { googleMapsApiKey: "" },
   );
 
   const [rides, setRides] = useState([
@@ -98,22 +65,17 @@ export default function Dashboard() {
       date: "2026-02-03",
       day: "Monday",
     },
-    {
-      id: 2,
-      route: ["Ameerpet", "SR Nagar", "Hitech City"],
-      time: "10:00 AM",
-      seats: 2,
-      date: "2026-02-03",
-      day: "Monday",
-    },
   ]);
 
+  const navigate=useNavigate()
 
-  //logout function
   const getLogOut=()=>{
     localStorage.clear(all)
-    navigate('/login')
+    navigate("/login")
+    
   }
+
+
 
   // ==============================
   // REALTIME SEATS (MOCK WEBSOCKET)
@@ -127,15 +89,29 @@ export default function Dashboard() {
             r.seats > 0
               ? Math.max(0, r.seats - (Math.random() > 0.7 ? 1 : 0))
               : r.seats,
-        }))
+        })),
       );
     }, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const userData = JSON.parse(storedUser);
+      setUser((prevUser) => ({
+        ...prevUser,
+        name: userData.name || prevUser.name,
+        emailid: userData.email || prevUser.emailid,
+      }));
+    }
+  }, []);
+
   const filteredRides = rides.filter((ride) =>
-    ride.route.some((city) => city.toLowerCase().includes(search.toLowerCase()))
+    ride.route.some((city) =>
+      city.toLowerCase().includes(search.toLowerCase()),
+    ),
   );
 
   const addCity = () => {
@@ -180,34 +156,67 @@ export default function Dashboard() {
     toast.success("Ride Published Successfully 🚀");
   };
 
-  const sendOtp = () => {
-    if (!user.phone) {
-      toast.error("Enter mobile number first");
+  const sendOtp = async () => {
+    if (!user.emailid) {
+      toast.error("Enter email address first");
       return;
     }
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otp);
-    setOtpSent(true);
-    console.log("DEV OTP:", otp); // Replace with Firebase/Twilio in production
-    toast.success("OTP sent to your mobile number");
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailid: user.emailid }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setOtpSent(true);
+        toast.success("OTP sent to your email");
+      } else {
+        toast.error(data.error || "Failed to send OTP");
+      }
+    } catch (error) {
+      console.error(error, "error while sending otp");
+      toast.error("Error sending OTP: " + error.message);
+    }
   };
 
-  const verifyOtp = () => {
-    if (otpInput === generatedOtp) {
-      setUser({ ...user, phoneVerified: true });
-      setOtpSent(false);
-      setOtpInput("");
-      toast.success("Mobile verified successfully");
-    } else {
-      toast.error("Invalid OTP");
+  const verifyOtp = async () => {
+    if (!otpInput) {
+      toast.error("Enter OTP first");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/verifyotp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailid: user.emailid, otp: otpInput }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setUser({ ...user, emailVerifed: true });
+        setOtpSent(false);
+        setOtpInput("");
+        toast.success("Email verified successfully");
+      } else {
+        toast.error(data.error || "Invalid or expired OTP");
+      }
+    } catch (error) {
+      console.error(error, "error while verifying otp");
+      toast.error("Error verifying OTP: " + error.message);
     }
   };
 
   const joinRide = (ride) => {
-    if (!user.phoneVerified) {
+    if (!user.emailVerifed) {
       setShowProfile(true);
       return toast.error(
-        "Please verify your mobile number before joining rides"
+        "Please verify your mobile number before joining rides",
       );
     }
 
@@ -456,6 +465,7 @@ export default function Dashboard() {
                 <input
                   className="w-full px-4 py-2 rounded-full border"
                   value={user.name}
+                  readOnly
                   onChange={(e) => setUser({ ...user, name: e.target.value })}
                 />
 
@@ -464,10 +474,21 @@ export default function Dashboard() {
                   className="w-full px-4 py-2 rounded-full border"
                   placeholder="Enter mobile number"
                   value={user.phone}
+                  required
                   onChange={(e) => setUser({ ...user, phone: e.target.value })}
                 />
+                <label className="text-sm">Email Id</label>
+                <input
+                  className="w-full px-4 py-2 rounded-full border"
+                  placeholder="Enter Email Id"
+                  value={user.emailid}
+                  readOnly
+                  onChange={(e) =>
+                    setUser({ ...user, emailid: e.target.value })
+                  }
+                />
 
-                {!user.phoneVerified && !otpSent && (
+                {!user.emailVerifed && !otpSent && (
                   <button
                     className="w-full bg-black text-white py-2 rounded-full"
                     onClick={sendOtp}
@@ -476,11 +497,11 @@ export default function Dashboard() {
                   </button>
                 )}
 
-                {!user.phoneVerified && otpSent && (
+                {!user.emailVerifed && otpSent && (
                   <div className="space-y-2">
                     <input
                       className="w-full px-4 py-2 rounded-full border"
-                      placeholder="Enter OTP"
+                      placeholder="Enter Email OTP"
                       value={otpInput}
                       onChange={(e) => setOtpInput(e.target.value)}
                     />
@@ -493,8 +514,8 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {user.phoneVerified && (
-                  <p className="text-green-600 text-sm">Mobile Verified ✔</p>
+                {user.emailVerifed && (
+                  <p className="text-green-600 text-sm">Email Verified ✔</p>
                 )}
               </div>
 
@@ -547,7 +568,7 @@ export default function Dashboard() {
                   className="w-full bg-blue-500 text-white py-2 rounded-full"
                   onClick={() =>
                     toast.success(
-                      "Captain verification request sent to backend"
+                      "Captain verification request sent to backend",
                     )
                   }
                 >
@@ -555,7 +576,8 @@ export default function Dashboard() {
                 </button>
 
                 <p className="text-sm text-gray-500">Status: {captainStatus}</p>
-                <div className="mt-20 flex justify-center">
+              
+              <div className="mt-10 flex justify-center">
                   <p>
                     <button onClick={getLogOut}
                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold 
@@ -574,36 +596,36 @@ export default function Dashboard() {
   );
 }
 
-// ==============================
-// BASIC TEST CASES (JEST)
-// ==============================
-/*
-import { render, fireEvent } from "@testing-library/react";
-import GoRidesLanding from "./GoRidesLanding";
+// // ==============================
+// // BASIC TEST CASES (JEST)
+// // ==============================
+// /*
+// import { render, fireEvent } from "@testing-library/react";
+// import GoRidesLanding from "./GoRidesLanding";
 
-test("opens profile panel when profile button is clicked", () => {
-  const { getByText } = render(<GoRidesLanding />);
-  fireEvent.click(getByText("👤"));
-  expect(getByText("My Profile")).toBeInTheDocument();
-});
+// test("opens profile panel when profile button is clicked", () => {
+//   const { getByText } = render(<GoRidesLanding />);
+//   fireEvent.click(getByText("👤"));
+//   expect(getByText("My Profile")).toBeInTheDocument();
+// });
 
-test("prevents publishing ride when not approved", () => {
-  const { getByText } = render(<GoRidesLanding />);
-  fireEvent.click(getByText("Captain Mode"));
-  fireEvent.click(getByText("Publish Ride →"));
-  expect(
-    getByText("Captain must be approved before creating rides")
-  ).toBeInTheDocument();
-});
+// test("prevents publishing ride when not approved", () => {
+//   const { getByText } = render(<GoRidesLanding />);
+//   fireEvent.click(getByText("Captain Mode"));
+//   fireEvent.click(getByText("Publish Ride →"));
+//   expect(
+//     getByText("Captain must be approved before creating rides")
+//   ).toBeInTheDocument();
+// });
 
-// NEW TEST
-// verifies day auto-calculates from date
-test("calculates day of week from selected date", () => {
-  const { getByText, getByLabelText } = render(<GoRidesLanding />);
-  fireEvent.click(getByText("Captain Mode"));
-  const dateInput = document.querySelector('input[type="date"]');
-  fireEvent.change(dateInput, { target: { value: "2026-02-03" } });
-  fireEvent.click(getByText("Create Ride →"));
-  expect(document.body.textContent).toMatch(/Tuesday|Monday|Wednesday/);
-});
-*/
+// // NEW TEST
+// // verifies day auto-calculates from date
+// test("calculates day of week from selected date", () => {
+//   const { getByText, getByLabelText } = render(<GoRidesLanding />);
+//   fireEvent.click(getByText("Captain Mode"));
+//   const dateInput = document.querySelector('input[type="date"]');
+//   fireEvent.change(dateInput, { target: { value: "2026-02-03" } });
+//   fireEvent.click(getByText("Create Ride →"));
+//   expect(document.body.textContent).toMatch(/Tuesday|Monday|Wednesday/);
+// });
+// */
