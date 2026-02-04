@@ -31,21 +31,16 @@
 
 // export default Dashboard;
 
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect } from "react";
+import { LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { all } from "axios";
 
+const navigate=useNavigate()
 // ==============================
 // CONFIG
 // ==============================
@@ -55,6 +50,8 @@ import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 const GOOGLE_MAPS_KEY = ""; // <-- Put your real key here in production
 
 export default function Dashboard() {
+
+  
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("find");
   const [showProfile, setShowProfile] = useState(false);
@@ -111,6 +108,13 @@ export default function Dashboard() {
     },
   ]);
 
+
+  //logout function
+  const getLogOut=()=>{
+    localStorage.clear(all)
+    navigate('/login')
+  }
+
   // ==============================
   // REALTIME SEATS (MOCK WEBSOCKET)
   // ==============================
@@ -131,9 +135,7 @@ export default function Dashboard() {
   }, []);
 
   const filteredRides = rides.filter((ride) =>
-    ride.route.some((city) =>
-      city.toLowerCase().includes(search.toLowerCase())
-    )
+    ride.route.some((city) => city.toLowerCase().includes(search.toLowerCase()))
   );
 
   const addCity = () => {
@@ -220,18 +222,18 @@ export default function Dashboard() {
         {/* TOP BAR */}
         <div className="w-full max-w-md px-4 py-3 flex justify-between items-center fixed top-0 bg-white z-10 border-b">
           <button
-  onClick={() => {
-    setScreen("home");
-    setShowProfile(false);
-  }}
-  className="font-bold text-lg"
->
-  Go{""}
-  <span className="text-red-500 font-extrabold">
-    <span className="text-2xl inline-block align-baseline">R</span>ides
-  </span>
-</button>
-
+            onClick={() => {
+              setScreen("home");
+              setShowProfile(false);
+            }}
+            className="font-bold text-lg"
+          >
+            Go{""}
+            <span className="text-red-500 font-extrabold">
+              <span className="text-2xl inline-block align-baseline">R</span>
+              ides
+            </span>
+          </button>
 
           <button
             onClick={() => setShowProfile(true)}
@@ -374,7 +376,8 @@ export default function Dashboard() {
                           {ride.route.join(" → ")}
                         </p>
                         <p className="text-sm text-gray-300">
-                          {ride.day} • {ride.date} • {ride.time} • Seats: {ride.seats}
+                          {ride.day} • {ride.date} • {ride.time} • Seats:{" "}
+                          {ride.seats}
                         </p>
                       </div>
                       <button
@@ -453,9 +456,7 @@ export default function Dashboard() {
                 <input
                   className="w-full px-4 py-2 rounded-full border"
                   value={user.name}
-                  onChange={(e) =>
-                    setUser({ ...user, name: e.target.value })
-                  }
+                  onChange={(e) => setUser({ ...user, name: e.target.value })}
                 />
 
                 <label className="text-sm">Mobile Number</label>
@@ -463,9 +464,7 @@ export default function Dashboard() {
                   className="w-full px-4 py-2 rounded-full border"
                   placeholder="Enter mobile number"
                   value={user.phone}
-                  onChange={(e) =>
-                    setUser({ ...user, phone: e.target.value })
-                  }
+                  onChange={(e) => setUser({ ...user, phone: e.target.value })}
                 />
 
                 {!user.phoneVerified && !otpSent && (
@@ -500,7 +499,9 @@ export default function Dashboard() {
               </div>
 
               <div className="border-t pt-4 space-y-2">
-                <h3 className="font-semibold">Captain Verification (Optional)</h3>
+                <h3 className="font-semibold">
+                  Captain Verification (Optional)
+                </h3>
 
                 <p className="text-sm text-gray-500">
                   Required only to create rides. Verified manually by backend
@@ -553,9 +554,17 @@ export default function Dashboard() {
                   Submit for Captain Approval
                 </button>
 
-                <p className="text-sm text-gray-500">
-                  Status: {captainStatus}
-                </p>
+                <p className="text-sm text-gray-500">Status: {captainStatus}</p>
+                <div className="mt-20 flex justify-center">
+                  <p>
+                    <button onClick={getLogOut}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold 
+                        hover:bg-red-600 transition-all shadow-md"
+                    >
+                      Logout <LogOut size={18} />
+                    </button>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -598,4 +607,3 @@ test("calculates day of week from selected date", () => {
   expect(document.body.textContent).toMatch(/Tuesday|Monday|Wednesday/);
 });
 */
-

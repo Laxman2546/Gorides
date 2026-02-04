@@ -25,14 +25,14 @@ export default function GoRidesLanding() {
   
   const navigate = useNavigate();
 const NavtoLogin=()=>{
-    navigate("\login")
+    navigate("/login")
   }
 
   const NavtoReg=()=>{
-    navigate("\register")
+    navigate("/register")
   }
   const NavtoHome=()=>{
-    navigate("")
+    navigate("/")
   }
 
   

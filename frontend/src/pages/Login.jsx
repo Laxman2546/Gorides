@@ -6,10 +6,10 @@ import { Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    username: "",
+    emailid: "",
     password: "",
   });
-  const [showPassword, setShowPassword] = useState(false); //  show/hide password state
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const togglePassword = () => {
@@ -36,7 +36,10 @@ const Login = () => {
         { withCredentials: true },
       );
       const data = response.data;
-      console.log(data);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ name: data.username, email: data.emailid }),
+      );
 
       toast.success("Login successful ", {
         position: "top-center",
@@ -64,7 +67,45 @@ const Login = () => {
     navigate("/register");
   };
 
+  const navtoLogin = () => {
+    navigate("/login");
+  };
+
+   const NavtoHome=()=>{
+    navigate("/")
+  }
+
+
+
+
   return (
+    <div>
+      {/* ================= HEADER ================= */}
+      <header className="fixed top-0 w-full bg-white/90 backdrop-blur border-b z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <button onClick={NavtoHome}>
+            <h1 className="text-xl md:text-2xl font-bold text-black cursor-pointer">
+            Go<span className="text-red-600">Rides</span>
+          </h1>
+          </button>
+          <div className="space-x-2">
+            <button onClick={navtoLogin}>
+              <a
+              href=""
+              className="px-4 py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-50 transition"
+            >
+              Log In
+            </a>
+            </button>
+            <button onClick={navtoReg}><a
+              href=""
+              className="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition"
+            >
+              Sign Up
+            </a></button>
+          </div>
+        </div>
+      </header>
     <div className="min-h-screen flex flex-col md:flex-row relative">
       <ToastContainer />
 
@@ -88,14 +129,14 @@ const Login = () => {
             {/* Username */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2 ml-1.5">
-                Username
+                Email Id
               </label>
               <input
                 type="text"
-                placeholder="Enter your username"
+                placeholder="Enter your emailid"
                 className="w-full px-4 py-3 border border-gray-300 rounded-4xl focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                name="username"
-                value={formData.username}
+                name="emailid"
+                value={formData.emailid}
                 onChange={handleChange}
                 required
               />
@@ -157,6 +198,7 @@ const Login = () => {
           </p>
         </div>
       </div>
+    </div>
     </div>
   );
 };

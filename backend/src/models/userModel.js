@@ -13,6 +13,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  phone: {
+    type: String,
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  emailOtp: {
+    type: String,
+  },
+  emailOtpExpires: {
+    type: Date,
+  },
 
   createdAt: { type: Date, default: Date.now },
 });

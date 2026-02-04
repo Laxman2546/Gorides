@@ -65,6 +65,11 @@ const Register = () => {
         { withCredentials: true },
       );
 
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ name: response.data.username, email: formData.email }),
+      );
+
       toast.success("User registered successfully!", {
         position: "top-right",
         autoClose: 3000,
@@ -81,9 +86,41 @@ const Register = () => {
     }
   };
 
-  const navtoLog = () => navigate("/");
+  const navtoLog = () => navigate("/login");
+  const navtoReg = () => navigate("/register");
+  const navtoHome = () => navigate("/");
+
 
   return (
+    <div>
+      {/* ================= HEADER ================= */}
+      <header className="fixed top-0 w-full bg-white/90 backdrop-blur border-b z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <button onClick={navtoHome}>
+            <h1 className="text-xl md:text-2xl font-bold text-black cursor-pointer">
+            Go<span className="text-red-600">Rides</span>
+          </h1>
+          </button>
+          <div className="space-x-2">
+            <button onClick={navtoLog}>
+              <a
+              href=""
+              className="px-4 py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-50 transition"
+            >
+              Log In
+            </a>
+            </button>
+            <button onClick={navtoReg}><a
+              href=""
+              className="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition"
+            >
+              Sign Up
+            </a></button>
+          </div>
+        </div>
+      </header>
+      
+    
     <div className="min-h-screen flex flex-col md:flex-row">
       <ToastContainer />
 
@@ -204,6 +241,7 @@ const Register = () => {
           className="w-full h-full object-cover"
         />
       </div>
+    </div>
     </div>
   );
 };
