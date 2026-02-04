@@ -6,10 +6,10 @@ import { Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    username: "",
+    emailid: "",
     password: "",
   });
-  const [showPassword, setShowPassword] = useState(false); //  show/hide password state
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const togglePassword = () => {
@@ -36,7 +36,10 @@ const Login = () => {
         { withCredentials: true },
       );
       const data = response.data;
-      console.log(data);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ name: data.username, email: data.emailid }),
+      );
 
       toast.success("Login successful ", {
         position: "top-center",
@@ -88,14 +91,14 @@ const Login = () => {
             {/* Username */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2 ml-1.5">
-                Username
+                Email Id
               </label>
               <input
                 type="text"
-                placeholder="Enter your username"
+                placeholder="Enter your emailid"
                 className="w-full px-4 py-3 border border-gray-300 rounded-4xl focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                name="username"
-                value={formData.username}
+                name="emailid"
+                value={formData.emailid}
                 onChange={handleChange}
                 required
               />

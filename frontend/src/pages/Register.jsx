@@ -65,6 +65,11 @@ const Register = () => {
         { withCredentials: true },
       );
 
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ name: response.data.username, email: formData.email }),
+      );
+
       toast.success("User registered successfully!", {
         position: "top-right",
         autoClose: 3000,
