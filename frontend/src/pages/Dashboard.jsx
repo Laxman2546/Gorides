@@ -74,6 +74,7 @@ export default function GoRidesLanding() {
 
 
 
+
   const submitCaptainVerification = () => {
   if (!user.phone || user.phone.trim().length < 10) {
     toast.error("Mobile number is required");
