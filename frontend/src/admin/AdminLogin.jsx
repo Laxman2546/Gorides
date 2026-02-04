@@ -1,26 +1,47 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-
+import axios from "axios";
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = () => {
+  const payLoad = {
+    email,
+    password,
+  };
+  const handleLogin = async () => {
     if (!email || !password) {
       toast.error("Enter admin credentials");
       return;
     }
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/admin/login`,
+        payLoad,
+      );
+      console.log(response.status);
+      if (response.status === 200) {
+        localStorage.setItem("adminAuth", true);
+        toast.success("Admin Logged In");
+        navigate("/admin/dashboard");
+      } else {
+        toast.error("check your credientials");
+      }
+    } catch (e) {
+      console.log(e);
+      toast.error("check your credientials");
+    }
 
     // TEMP AUTH (replace with backend)
-    if (email === "admin@gorides.com" && password === "admin123") {
-      localStorage.setItem("adminAuth", true);
-      toast.success("Admin Logged In");
-      navigate("/admin/dashboard");
-    } else {
-      toast.error("Invalid admin login");
-    }
+    // if (email === "admin@gorides.com" && password === "rides123") {
+    //   localStorage.setItem("adminAuth", true);
+    //   toast.success("Admin Logged In");
+    //   navigate("/admin/dashboard");
+    // } else {
+    //   toast.error("Invalid admin login");
+    // }
   };
 
   return (

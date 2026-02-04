@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import http from "http";
 import userRoute from "./src/routes/userRoute.js";
+import mapsRoute from "./src/routes/mapsRoute.js";
+import adminRoute from "./src/routes/adminRoute.js";
 import { connectDb } from "./src/config/db.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -20,7 +22,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", userRoute);
-
+app.use("/maps", mapsRoute);
+app.use("/admin", adminRoute);
 const port = process.env.PORT || 3001;
 server.listen(port, () => {
   console.log(`server is running ${port}`);

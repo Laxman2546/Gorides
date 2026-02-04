@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useRef } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -13,15 +10,10 @@ import {
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { all } from "axios";
+import axios from "axios";
 
-// ==============================
-// CONFIG
-// ==============================
 const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx80";
 
-// ==============================
-// MAIN COMPONENT
-// ==============================
 export default function GoRidesLanding() {
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("find");
@@ -59,17 +51,13 @@ export default function GoRidesLanding() {
   const captainStatus = user.dlVerified ? "approved" : "pending";
   const navigate = useNavigate();
 
-  // ==============================
   // GOOGLE MAPS LOADER
-  // ==============================
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_KEY,
     libraries: ["places"],
   });
 
-  // ==============================
   // RIDES
-  // ==============================
   const [rides, setRides] = useState([
     {
       id: 1,
@@ -81,17 +69,15 @@ export default function GoRidesLanding() {
     },
   ]);
 
-  // ==============================
   // GEO HELPERS
-  // ==============================
   const geocodeCity = async (city) => {
     if (routeCache[city]) return routeCache[city];
 
     try {
       const res = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          city
-        )}&key=${GOOGLE_MAPS_KEY}`
+          city,
+        )}&key=${GOOGLE_MAPS_KEY}`,
       );
       const data = await res.json();
       const location = data.results?.[0]?.geometry?.location;
@@ -115,9 +101,7 @@ export default function GoRidesLanding() {
     return points;
   };
 
-  // ==============================
   // MOCK REALTIME SEATS
-  // ==============================
   useEffect(() => {
     const interval = setInterval(() => {
       setRides((prev) =>
@@ -127,15 +111,13 @@ export default function GoRidesLanding() {
             r.seats > 0
               ? Math.max(0, r.seats - (Math.random() > 0.7 ? 1 : 0))
               : r.seats,
-        }))
+        })),
       );
     }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // ==============================
   // LOAD USER
-  // ==============================
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -147,19 +129,45 @@ export default function GoRidesLanding() {
       }));
     }
   }, []);
+  const getUserData = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/getuser`,
+        {
+          withCredentials: true,
+        },
+      );
+      const data = response.data;
+      setUser((prevUser) => ({
+        ...prevUser,
+        name: data.username || prevUser.name,
+        emailid: data.emailid || prevUser.emailid,
+        phone: data.phone || prevUser.phone,
+        emailVerifed: data.isEmailVerified || prevUser.emailVerifed,
+        dlVerified: data.dlVerified || prevUser.dlVerified,
+      }));
+    } catch (e) {
+      console.error("Error fetching user data:", e);
+      if (e.response?.status === 401) {
+        navigate("/login");
+      }
+    }
+  };
 
-  // ==============================
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      getUserData();
+    }
+  }, []);
   // FILTER
-  // ==============================
   const filteredRides = rides.filter((ride) =>
     ride.route.some((city) =>
-      city.toLowerCase().includes(search.toLowerCase())
-    )
+      city.toLowerCase().includes(search.toLowerCase()),
+    ),
   );
 
-  // ==============================
   // HELPERS
-  // ==============================
   const getLogOut = () => {
     localStorage.clear(all);
     navigate("/login");
@@ -215,9 +223,73 @@ export default function GoRidesLanding() {
     toast.success(`Join request sent for ${ride.route.join(" → ")}`);
   };
 
-  // ==============================
-  // UI
-  // ==============================
+  const sendOtp = async () => {
+    if (!user.phone || user.phone.trim().length < 10) {
+      toast.error("Please enter a valid mobile number first");
+      return;
+    }
+
+    if (!user.emailid) {
+      toast.error("Email not found");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailid: user.emailid }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpSent(true);
+        toast.success("OTP sent successfully");
+      } else {
+        toast.error(data.error || "Failed to send OTP");
+      }
+    } catch (error) {
+      toast.error("Error sending OTP");
+    }
+  };
+  const verifyOtp = async () => {
+    if (!otpInput) {
+      toast.error("Enter OTP first");
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/verifyotp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            emailid: user.emailid,
+            otp: otpInput,
+            phone: user.phone,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setUser({ ...user, emailVerifed: true });
+        setOtpSent(false);
+        setOtpInput("");
+        toast.success("Email verified successfully");
+        getUserData();
+      } else {
+        toast.error(data.error || "Invalid or expired OTP");
+      }
+    } catch (error) {
+      console.error(error, "error while verifying otp");
+      toast.error("Error verifying OTP: " + error.message);
+    }
+  };
+
   return (
     <>
       <ToastContainer position="top-center" />
@@ -386,7 +458,7 @@ export default function GoRidesLanding() {
                         <button
                           onClick={() =>
                             setExpandedRide(
-                              expandedRide === ride.id ? null : ride.id
+                              expandedRide === ride.id ? null : ride.id,
                             )
                           }
                           className="bg-gray-800 px-3 py-1 rounded-full"
@@ -457,9 +529,7 @@ export default function GoRidesLanding() {
                   className="w-full px-4 py-2 rounded-full border"
                   placeholder="Enter mobile number"
                   value={user.phone}
-                  onChange={(e) =>
-                    setUser({ ...user, phone: e.target.value })
-                  }
+                  onChange={(e) => setUser({ ...user, phone: e.target.value })}
                 />
 
                 <label className="text-sm">Email Id</label>
@@ -469,7 +539,35 @@ export default function GoRidesLanding() {
                   readOnly
                 />
               </div>
+              {!user.emailVerifed && !otpSent && (
+                <button
+                  className="w-full bg-black text-white py-2 rounded-full"
+                  onClick={sendOtp}
+                >
+                  Send OTP
+                </button>
+              )}
 
+              {!user.emailVerifed && otpSent && (
+                <div className="space-y-2">
+                  <input
+                    className="w-full px-4 py-2 rounded-full border"
+                    placeholder="Enter Email OTP"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                  />
+                  <button
+                    className="w-full bg-green-500 text-white py-2 rounded-full"
+                    onClick={verifyOtp}
+                  >
+                    Verify OTP
+                  </button>
+                </div>
+              )}
+
+              {user.emailVerifed && (
+                <p className="text-green-600 text-sm">Email Verified</p>
+              )}
               <div className="border-t pt-4 space-y-2">
                 <h3 className="font-semibold">
                   Captain Verification (Optional)
@@ -538,9 +636,6 @@ export default function GoRidesLanding() {
   );
 }
 
-// ==============================
-// LAZY MAP COMPONENT
-// ==============================
 function LazyRouteMap({ ride, isLoaded, buildRoute }) {
   const [points, setPoints] = useState([]);
   const mapRef = useRef(null);
@@ -621,11 +716,6 @@ Maps now live INSIDE the ride card
 and only load when "View Route" is clicked.
 */
 
-
-
-
-
-
 // import React, { useState, useEffect } from "react";
 // import { ToastContainer, toast } from "react-toastify";
 // import "react-toastify/dist/ReactToastify.css";
@@ -634,9 +724,9 @@ and only load when "View Route" is clicked.
 // import { Navigate, useNavigate } from "react-router-dom";
 // import { all } from "axios";
 
-// // // ==============================
+// // ==============================
 // // // CONFIG
-// // // ==============================
+// // ==============================
 // // // IMPORTANT:
 // // // If this is empty, maps will gracefully fallback to a placeholder UI
 // // to avoid Google Maps API errors in dev/sandbox environments.
@@ -725,9 +815,9 @@ and only load when "View Route" is clicked.
 //     // later you can call backend API here
 //   };
 
-//   // ==============================
+//  // ==============================
 //   // REALTIME SEATS (MOCK WEBSOCKET)
-//   // ==============================
+// ==============================
 //   useEffect(() => {
 //     const interval = setInterval(() => {
 //       setRides((prev) =>
@@ -1260,7 +1350,7 @@ and only load when "View Route" is clicked.
 //                   <p>
 //                     <button
 //                       onClick={getLogOut}
-//                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold 
+//                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold
 //                         hover:bg-red-600 transition-all shadow-md"
 //                     >
 //                       Logout <LogOut size={18} />
@@ -1276,9 +1366,9 @@ and only load when "View Route" is clicked.
 //   );
 // }
 
-// // // ==============================
+// // ==============================
 // // // BASIC TEST CASES (JEST)
-// // // ==============================
+// // ==============================
 // // /*
 // // import { render, fireEvent } from "@testing-library/react";
 // // import GoRidesLanding from "./GoRidesLanding";
@@ -1309,10 +1399,3 @@ and only load when "View Route" is clicked.
 // //   expect(document.body.textContent).toMatch(/Tuesday|Monday|Wednesday/);
 // // });
 // // */
-
-
-
-
-
-
-
