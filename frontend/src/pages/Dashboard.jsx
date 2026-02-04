@@ -157,31 +157,66 @@ export default function GoRidesLanding() {
   };
 
   const sendOtp = async () => {
-    if (!user.emailid) {
-      toast.error("Enter email address first");
-      return;
-    }
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ emailid: user.emailid }),
-        },
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setOtpSent(true);
-        toast.success("OTP sent to your email");
-      } else {
-        toast.error(data.error || "Failed to send OTP");
+  if (!user.phone || user.phone.trim().length < 10) {
+    toast.error("Please enter a valid mobile number first");
+    return;
+  }
+
+  if (!user.emailid) {
+    toast.error("Email not found");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailid: user.emailid }),
       }
-    } catch (error) {
-      console.error(error, "error while sending otp");
-      toast.error("Error sending OTP: " + error.message);
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setOtpSent(true);
+      toast.success("OTP sent successfully");
+    } else {
+      toast.error(data.error || "Failed to send OTP");
     }
-  };
+  } catch (error) {
+    toast.error("Error sending OTP");
+  }
+};
+
+
+  // const sendOtp = async () => {
+  //   if (!user.emailid) {
+  //     toast.error("Enter email address first");
+  //     return;
+  //   }
+  //   try {
+  //     const response = await fetch(
+  //       `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
+  //       {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ emailid: user.emailid }),
+  //       },
+  //     );
+  //     const data = await response.json();
+  //     if (response.ok) {
+  //       setOtpSent(true);
+  //       toast.success("OTP sent to your email");
+  //     } else {
+  //       toast.error(data.error || "Failed to send OTP");
+  //     }
+  //   } catch (error) {
+  //     console.error(error, "error while sending otp");
+  //     toast.error("Error sending OTP: " + error.message);
+  //   }
+  // };
 
   const verifyOtp = async () => {
     if (!otpInput) {
