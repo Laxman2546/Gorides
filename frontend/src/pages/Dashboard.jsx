@@ -6,7 +6,6 @@ import { LogOut } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { all } from "axios";
 
-
 // // ==============================
 // // CONFIG
 // // ==============================
@@ -16,9 +15,6 @@ import { all } from "axios";
 const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8"; // <-- Put your real key here in production
 
 export default function GoRidesLanding() {
-  
-
-  
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("find");
   const [showProfile, setShowProfile] = useState(false);
@@ -40,6 +36,7 @@ export default function GoRidesLanding() {
   const [time, setTime] = useState("");
   const [seats, setSeats] = useState(1);
   const [date, setDate] = useState("");
+  const [dlNumber, setDlNumber] = useState("");
 
   // OTP STATE
   const [otpSent, setOtpSent] = useState(false);
@@ -53,7 +50,7 @@ export default function GoRidesLanding() {
   const { isLoaded } = useJsApiLoader(
     shouldLoadMaps
       ? { googleMapsApiKey: GOOGLE_MAPS_KEY }
-      : { googleMapsApiKey: "" },
+      : { googleMapsApiKey: "" }
   );
 
   const [rides, setRides] = useState([
@@ -67,14 +64,41 @@ export default function GoRidesLanding() {
     },
   ]);
 
-  const navigate=useNavigate()
+  const navigate = useNavigate();
 
-  const getLogOut=()=>{
-    localStorage.clear(all)
-    navigate("/login")
-    
+  const getLogOut = () => {
+    localStorage.clear(all);
+    navigate("/login");
+  };
+
+
+
+
+  const submitCaptainVerification = () => {
+  if (!user.phone || user.phone.trim().length < 10) {
+    toast.error("Mobile number is required");
+    return;
   }
 
+  if (!dlNumber.trim()) {
+    toast.error("Driving License number is required");
+    return;
+  }
+
+  if (!user.vehicle.name.trim()) {
+    toast.error("Vehicle name is required");
+    return;
+  }
+
+  if (!user.vehicle.number.trim()) {
+    toast.error("Vehicle number is required");
+    return;
+  }
+
+  toast.success("Captain verification request sent to backend 🚀");
+
+  // later you can call backend API here
+};
 
 
   // ==============================
@@ -89,7 +113,7 @@ export default function GoRidesLanding() {
             r.seats > 0
               ? Math.max(0, r.seats - (Math.random() > 0.7 ? 1 : 0))
               : r.seats,
-        })),
+        }))
       );
     }, 5000);
 
@@ -109,9 +133,7 @@ export default function GoRidesLanding() {
   }, []);
 
   const filteredRides = rides.filter((ride) =>
-    ride.route.some((city) =>
-      city.toLowerCase().includes(search.toLowerCase()),
-    ),
+    ride.route.some((city) => city.toLowerCase().includes(search.toLowerCase()))
   );
 
   const addCity = () => {
@@ -157,39 +179,38 @@ export default function GoRidesLanding() {
   };
 
   const sendOtp = async () => {
-  if (!user.phone || user.phone.trim().length < 10) {
-    toast.error("Please enter a valid mobile number first");
-    return;
-  }
-
-  if (!user.emailid) {
-    toast.error("Email not found");
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailid: user.emailid }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (response.ok) {
-      setOtpSent(true);
-      toast.success("OTP sent successfully");
-    } else {
-      toast.error(data.error || "Failed to send OTP");
+    if (!user.phone || user.phone.trim().length < 10) {
+      toast.error("Please enter a valid mobile number first");
+      return;
     }
-  } catch (error) {
-    toast.error("Error sending OTP");
-  }
-};
 
+    if (!user.emailid) {
+      toast.error("Email not found");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailid: user.emailid }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpSent(true);
+        toast.success("OTP sent successfully");
+      } else {
+        toast.error(data.error || "Failed to send OTP");
+      }
+    } catch (error) {
+      toast.error("Error sending OTP");
+    }
+  };
 
   // const sendOtp = async () => {
   //   if (!user.emailid) {
@@ -230,7 +251,7 @@ export default function GoRidesLanding() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ emailid: user.emailid, otp: otpInput }),
-        },
+        }
       );
       const data = await response.json();
       if (response.ok) {
@@ -248,10 +269,10 @@ export default function GoRidesLanding() {
   };
 
   const joinRide = (ride) => {
-    if (!user.emailVerifed) {
+    if (!user.emailVerifed || !user.phone) {
       setShowProfile(true);
       return toast.error(
-        "Please verify your mobile number before joining rides",
+        "Please verify your mobile number before joining rides"
       );
     }
 
@@ -565,9 +586,12 @@ export default function GoRidesLanding() {
                 </p>
 
                 <input
-                  className="w-full px-4 py-2 rounded-full border"
-                  placeholder="Driving License Number"
-                />
+  className="w-full px-4 py-2 rounded-full border"
+  placeholder="Driving License Number"
+  value={dlNumber}
+  onChange={(e) => setDlNumber(e.target.value)}
+/>
+
 
                 <input
                   className="w-full px-4 py-2 rounded-full border"
@@ -601,20 +625,17 @@ export default function GoRidesLanding() {
 
                 <button
                   className="w-full bg-blue-500 text-white py-2 rounded-full"
-                  onClick={() =>
-                    toast.success(
-                      "Captain verification request sent to backend",
-                    )
-                  }
+                  onClick={submitCaptainVerification}
                 >
                   Submit for Captain Approval
                 </button>
 
                 <p className="text-sm text-gray-500">Status: {captainStatus}</p>
-              
-              <div className="mt-10 flex justify-center">
+
+                <div className="mt-10 flex justify-center">
                   <p>
-                    <button onClick={getLogOut}
+                    <button
+                      onClick={getLogOut}
                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold 
                         hover:bg-red-600 transition-all shadow-md"
                     >
