@@ -10,6 +10,8 @@ const Login = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const togglePassword = () => {
@@ -30,6 +32,7 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
+      setLoading(true);
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/auth/api/login`,
         formData,
@@ -60,6 +63,8 @@ const Login = () => {
           autoClose: 2500,
         });
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,9 +176,10 @@ const Login = () => {
 
                 <button
                   type="submit"
+                  disabled={loading}
                   className="w-full bg-emerald-500 text-white py-3.5 rounded-xl font-semibold hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg"
                 >
-                  Sign In
+                  {loading ? "Signing In..." : "  Sign In"}
                 </button>
               </form>
 
@@ -199,11 +205,19 @@ const Login = () => {
 
             <p className="text-center text-xs text-gray-500 mt-6">
               By signing in, you agree to our{" "}
-              <a href="#" className="text-emerald-600 hover:underline">
+              <a
+                target="_blank"
+                href="https://www.termsfeed.com/live/938b07fe-145f-471d-8418-9ce9c4210b3b"
+                className="text-emerald-600 hover:underline"
+              >
                 Terms of Service
               </a>{" "}
               and{" "}
-              <a href="#" className="text-emerald-600 hover:underline">
+              <a
+                target="_blank"
+                href="https://www.termsfeed.com/live/3dd25c5e-f031-4755-8b2d-47b7a8b3bfbb"
+                className="text-emerald-600 hover:underline"
+              >
                 Privacy Policy
               </a>
             </p>

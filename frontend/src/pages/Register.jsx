@@ -254,11 +254,19 @@ const Register = () => {
 
             <p className="text-center text-xs text-gray-500 mt-6">
               By creating an account, you agree to our{" "}
-              <a href="#" className="text-emerald-600 hover:underline">
+              <a
+                target="_blank"
+                href="https://www.termsfeed.com/live/938b07fe-145f-471d-8418-9ce9c4210b3b"
+                className="text-emerald-600 hover:underline"
+              >
                 Terms of Service
               </a>{" "}
               and{" "}
-              <a href="#" className="text-emerald-600 hover:underline">
+              <a
+                target="_blank"
+                href="https://www.termsfeed.com/live/3dd25c5e-f031-4755-8b2d-47b7a8b3bfbb"
+                className="text-emerald-600 hover:underline"
+              >
                 Privacy Policy
               </a>
             </p>

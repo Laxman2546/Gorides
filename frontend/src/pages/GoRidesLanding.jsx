@@ -448,19 +448,6 @@ export default function GoRidesLanding() {
                 </h3>
                 <div className="space-y-4">
                   <a
-                    href="tel:+911234567890"
-                    className="flex items-center gap-4 text-gray-700 hover:text-emerald-600 transition-colors group"
-                  >
-                    <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                      <Phone className="text-emerald-600" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Phone</div>
-                      <div className="font-semibold">+91 123 456 7890</div>
-                    </div>
-                  </a>
-
-                  <a
                     href="mailto:support@gorides.com"
                     className="flex items-center gap-4 text-gray-700 hover:text-emerald-600 transition-colors group"
                   >
@@ -549,19 +536,22 @@ export default function GoRidesLanding() {
               <h4 className="font-semibold text-white mb-4">Legal</h4>
               <div className="space-y-2">
                 <a
-                  href="#"
+                  target="_blank"
+                  href="https://www.termsfeed.com/live/3dd25c5e-f031-4755-8b2d-47b7a8b3bfbb"
                   className="block hover:text-emerald-400 transition-colors"
                 >
                   Privacy Policy
                 </a>
                 <a
-                  href="#"
+                  target="_blank"
+                  href="https://www.termsfeed.com/live/938b07fe-145f-471d-8418-9ce9c4210b3b"
                   className="block hover:text-emerald-400 transition-colors"
                 >
                   Terms of Service
                 </a>
                 <a
-                  href="#"
+                  target="_blank"
+                  href="https://www.termsfeed.com/live/91052487-d68d-42f0-8bfc-b1fe37c1d49b"
                   className="block hover:text-emerald-400 transition-colors"
                 >
                   Cookie Policy
