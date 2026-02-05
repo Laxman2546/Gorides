@@ -13,8 +13,26 @@ const app = express();
 const server = http.createServer(app);
 
 connectDb();
-const allowedOrigins = ["http://localhost:5173",""];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+
+const allowedOrigins = ["http://localhost:5173", "https://gorides.vercel.app"];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, origin);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,7 +45,6 @@ app.use("/auth", userRoute);
 app.use("/maps", mapsRoute);
 app.use("/admin", adminRoute);
 app.use("/captain", captainRoute);
-app.use("/rides", ridesRoute);
 app.use("/rides", ridesRoute);
 const port = process.env.PORT || 3001;
 server.listen(port, () => {
