@@ -1,6 +1,7 @@
 import React from "react";
 import { Calendar, Clock, Users, User, X } from "lucide-react";
 import RideRouteMap from "./RideRouteMap.jsx";
+import RideLiveLocationMap from "./RideLiveLocationMap.jsx";
 import CaptainBookingsPanel from "./CaptainBookingsPanel.jsx";
 
 export default function RideCard({
@@ -21,14 +22,16 @@ export default function RideCard({
   isLoaded,
   buildRoute,
   getShortCity,
+  userLocation,
+  locationError,
 }) {
   const showPaymentDetails = Boolean(ride.paymentStatus);
   const bookingStatus = ride.bookingStatus;
-  const canGenerateOtp = bookingStatus === "confirmed";
   const isPending = bookingStatus === "pending";
   const canPay =
     bookingStatus === "completed" && ride.paymentStatus === "pending";
-
+  const showLiveLocation = bookingStatus === "confirmed";
+  console.log(ride, "iam ride");
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       {ride.bookingStatus && (
@@ -80,23 +83,10 @@ export default function RideCard({
       <div className="p-5">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 pr-12">
               <h3 className="text-lg font-bold text-gray-900">
                 {ride.route.map(getShortCity).join(" -> ")}
               </h3>
-              {ride.bookingStatus && (
-                <span
-                  className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                    ride.bookingStatus === "confirmed"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : ride.bookingStatus === "completed"
-                        ? "bg-gray-100 text-gray-700"
-                        : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {ride.bookingStatus}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-1">
@@ -137,8 +127,18 @@ export default function RideCard({
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">{ride.vehicle} Bike</p>
+            <p className="text-sm text-black font-bold ">
+              {ride.vehicleNumber.split("").join(" ")}
+            </p>
           </div>
         </div>
+        {ride.bookingStatus == "confirmed" && (
+          <div>
+            <p className="font-medium text-gray-600 pl-3 pb-3">
+              Captain Number: {ride.phone || "N/A"}
+            </p>
+          </div>
+        )}
 
         <div className="flex gap-3">
           {isCaptainOwner ? (
@@ -166,13 +166,10 @@ export default function RideCard({
                   Awaiting Captain
                 </button>
               )}
-              {canGenerateOtp && (
-                <button
-                  onClick={onGenerateOtp}
-                  className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
-                >
-                  {ride.bookingOtp ? "Refresh OTP" : "Generate OTP"}
-                </button>
+              {bookingStatus === "confirmed" && (
+                <div className="flex-1 bg-emerald-50 text-emerald-700 py-2.5 rounded-xl font-semibold text-center">
+                  {ride.bookingOtp.split("").join(" ")}
+                </div>
               )}
               {canPay && (
                 <button
@@ -214,7 +211,9 @@ export default function RideCard({
             {expanded && (
               <>
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-gray-900">Route Details</h4>
+                  <h4 className="font-semibold text-gray-900">
+                    {showLiveLocation ? "Live Location" : "Route Details"}
+                  </h4>
                   <button
                     onClick={onToggleExpand}
                     className="text-sm text-gray-500 hover:text-gray-700"
@@ -223,43 +222,58 @@ export default function RideCard({
                   </button>
                 </div>
 
-                <RideRouteMap
-                  ride={ride}
-                  isLoaded={isLoaded}
-                  buildRoute={buildRoute}
-                />
+                {showLiveLocation ? (
+                  <RideLiveLocationMap
+                    isLoaded={isLoaded}
+                    selfLabel={isCaptainOwner ? "Captain" : "User"}
+                    otherLabel={isCaptainOwner ? "User" : "Captain"}
+                    selfLocation={userLocation}
+                    locationError={locationError}
+                    otherLocation={
+                      isCaptainOwner ? ride.riderLocation : ride.captainLocation
+                    }
+                  />
+                ) : (
+                  <RideRouteMap
+                    ride={ride}
+                    isLoaded={isLoaded}
+                    buildRoute={buildRoute}
+                  />
+                )}
 
-                <div className="bg-gray-50 rounded-xl p-4">
-                  {ride.route.map((city, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            idx === 0
-                              ? "bg-emerald-500"
-                              : idx === ride.route.length - 1
-                                ? "bg-red-500"
-                                : "bg-gray-300"
-                          }`}
-                        ></div>
-                        {idx < ride.route.length - 1 && (
-                          <div className="w-0.5 h-8 bg-gray-300"></div>
-                        )}
+                {!showLiveLocation && (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    {ride.route.map((city, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              idx === 0
+                                ? "bg-emerald-500"
+                                : idx === ride.route.length - 1
+                                  ? "bg-red-500"
+                                  : "bg-gray-300"
+                            }`}
+                          ></div>
+                          {idx < ride.route.length - 1 && (
+                            <div className="w-0.5 h-8 bg-gray-300"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {getShortCity(city)}
+                          </p>
+                          {idx === 0 && (
+                            <p className="text-xs text-gray-500">Pickup</p>
+                          )}
+                          {idx === ride.route.length - 1 && (
+                            <p className="text-xs text-gray-500">Drop</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {getShortCity(city)}
-                        </p>
-                        {idx === 0 && (
-                          <p className="text-xs text-gray-500">Pickup</p>
-                        )}
-                        {idx === ride.route.length - 1 && (
-                          <p className="text-xs text-gray-500">Drop</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 

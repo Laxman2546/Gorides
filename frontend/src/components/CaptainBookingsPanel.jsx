@@ -47,6 +47,9 @@ export default function CaptainBookingsPanel({
                 Seats: {booking.seats || 1}
               </div>
             </div>
+            <p className="text-sm font-semibold mb-2 text-gray-900">
+              Rider Number: {booking.userId?.phone || "N/A"}
+            </p>
 
             {booking.status === "pending" && (
               <div className="flex items-center gap-2">
@@ -57,7 +60,7 @@ export default function CaptainBookingsPanel({
                   Accept
                 </button>
                 <button
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+                  className="flex-1 px-3 py-2 rounded-lg border bg-red-600 border-gray-200 text-white text-sm font-semibold hover:bg-red-500 hover:border-red-500"
                   onClick={() => onDecline?.(bookingId)}
                 >
                   Decline

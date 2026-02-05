@@ -65,6 +65,21 @@ const rideSchema = new mongoose.Schema({
         enum: ["pending", "paid"],
         default: "pending",
       },
+      paymentOrderId: {
+        type: String,
+      },
+      paymentId: {
+        type: String,
+      },
+      paymentSignature: {
+        type: String,
+      },
+      paymentAmount: {
+        type: Number,
+      },
+      paidAt: {
+        type: Date,
+      },
       createdAt: {
         type: Date,
         default: Date.now,

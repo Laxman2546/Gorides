@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Car } from "lucide-react";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -71,134 +71,145 @@ const Login = () => {
     navigate("/login");
   };
 
-   const NavtoHome=()=>{
-    navigate("/")
-  }
-
-
-
+  const NavtoHome = () => {
+    navigate("/");
+  };
 
   return (
-    <div>
-      {/* ================= HEADER ================= */}
-      <header className="fixed top-0 w-full bg-white/90 backdrop-blur border-b z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <button onClick={NavtoHome}>
-            <h1 className="text-xl md:text-2xl font-bold text-black cursor-pointer">
-            Go<span className="text-red-600">Rides</span>
-          </h1>
+    <div className="min-h-screen bg-gray-50">
+      <ToastContainer />
+
+      <header className="fixed top-0 w-full bg-white shadow-sm z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <button onClick={NavtoHome} className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center shadow-md">
+              <Car className="text-white" size={22} />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Go<span className="text-emerald-500">Rides</span>
+            </h1>
           </button>
-          <div className="space-x-2">
-            <button onClick={navtoLogin}>
-              <a
-              href=""
-              className="px-4 py-2 rounded-full border border-red-500 text-red-500 hover:bg-red-50 transition"
+          <div className="flex gap-3">
+            <button
+              onClick={navtoLogin}
+              className="px-6 py-2.5 rounded-xl border-2 border-emerald-500 text-emerald-600 font-semibold hover:bg-emerald-50 transition-colors"
             >
               Log In
-            </a>
             </button>
-            <button onClick={navtoReg}><a
-              href=""
-              className="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition"
+            <button
+              onClick={navtoReg}
+              className="px-6 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-colors shadow-md"
             >
               Sign Up
-            </a></button>
+            </button>
           </div>
         </div>
       </header>
-    <div className="min-h-screen flex flex-col md:flex-row relative">
-      <ToastContainer />
 
-      {/* Left Side - Image */}
-      <div className="hidden md:flex w-1/2 h-screen">
-        <img
-          src="image.png"
-          alt="bank background"
-          className="w-full h-full object-cover"
-        />
-      </div>
+      <div className="flex flex-col md:flex-row pt-20 min-h-screen justify-center">
+        <div className="flex w-full md:w-1/2 justify-center items-center px-6 py-12 bg-gray-50">
+          <div className="w-full max-w-md">
+            <div className="bg-white shadow-lg rounded-3xl p-8 border border-gray-100">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Welcome Back
+                </h1>
+                <p className="text-gray-500">
+                  Sign in to continue your journey
+                </p>
+              </div>
 
-      {/* Right Side - Form */}
-      <div className="flex w-full md:w-1/2 h-screen justify-center items-center bg-linear-to-br from-blue-50 to-blue-100 px-6">
-        <div className="w-full max-w-md bg-white shadow-xl rounded-2xl p-8 relative">
-          <h1 className="text-4xl font-bold text-blue-600 text-center mb-8">
-            Welcome Back
-          </h1>
+              <form className="space-y-5" onSubmit={handleLogin}>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                    name="emailid"
+                    value={formData.emailid}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
 
-          <form className="space-y-6">
-            {/* Username */}
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2 ml-1.5">
-                Email Id
-              </label>
-              <input
-                type="text"
-                placeholder="Enter your emailid"
-                className="w-full px-4 py-3 border border-gray-300 rounded-4xl focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                name="emailid"
-                value={formData.emailid}
-                onChange={handleChange}
-                required
-              />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all pr-12"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      onClick={togglePassword}
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleForgetPassword}
+                    className="text-sm text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-500 text-white py-3.5 rounded-xl font-semibold hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  Sign In
+                </button>
+              </form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500">
+                    New to GoRides?
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={navtoReg}
+                className="w-full border-2 border-emerald-500 text-emerald-600 py-3.5 rounded-xl font-semibold hover:bg-emerald-50 transition-all duration-200"
+              >
+                Create an Account
+              </button>
             </div>
 
-            {/* Password with Eye Toggle */}
-            <div className="relative">
-              <label className="block text-gray-700 font-semibold mb-2 ml-1.5">
-                Password
-              </label>
-              <input
-                type={showPassword ? "text" : "password"} //  toggle type
-                placeholder="Enter your password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-4xl focus:ring-2 focus:ring-blue-400 focus:outline-none pr-12"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-              />
-              <span
-                className="absolute right-1/300 top-14 rounded-br-4xl bg-blue-200 rounded-tr-4xl transform -translate-y-1/2 cursor-pointer text-gray-500 border p-3"
-                onClick={togglePassword}
-              >
-                {showPassword ? <EyeOff size={21} /> : <Eye size={24} />}
-              </span>
-            </div>
-
-            {/* Forgot Password */}
-            <div className="flex justify-end items-center mb-2">
-              <a
-                onClick={handleForgetPassword}
-                href="#"
-                className="text-sm text-blue-600 hover:underline font-medium"
-              >
-                Forgot password?
+            <p className="text-center text-xs text-gray-500 mt-6">
+              By signing in, you agree to our{" "}
+              <a href="#" className="text-emerald-600 hover:underline">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="#" className="text-emerald-600 hover:underline">
+                Privacy Policy
               </a>
-            </div>
-
-            {/* Login Button */}
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-4xl font-semibold hover:bg-blue-700 transition-all duration-200"
-              onClick={handleLogin}
-            >
-              Login
-            </button>
-          </form>
-
-          <p className="text-center text-gray-600 mt-6 text-sm">
-            Don’t have an account?{" "}
-            <button onClick={navtoReg}>
-              <a
-                href=""
-                className="text-blue-600 font-semibold hover:underline"
-              >
-                Register here
-              </a>
-            </button>
-          </p>
+            </p>
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 };

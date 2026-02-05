@@ -1,6 +1,8 @@
 import ridesModel from "../models/rideModel.js";
 import captianModel from "../models/captainModel.js";
 import { getDistanceTime } from "../utilis/mapservice.js";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 
 const parseDistanceKm = (distanceText) => {
   if (!distanceText) return 0;
@@ -27,26 +29,45 @@ const parseDurationMinutes = (durationText) => {
 };
 
 const calculatePrice = (distanceKm, durationMin) => {
-  const baseFare = 2;
+  const baseFare = 12;
   const perKmRate =
     distanceKm <= 3
-      ? 1.2
+      ? 5
       : distanceKm <= 10
-        ? 1.0
+        ?3.0
         : distanceKm <= 25
-          ? 0.9
-          : 0.8;
+          ? 2.9
+          : 2.8;
   const distanceCost = distanceKm * perKmRate;
   const timeCost = (durationMin / 60) * 0.2;
   const rawPrice = distanceCost + timeCost + baseFare;
   const competitiveDiscount = Number(process.env.COMP_PRICE_FACTOR || 0.85);
-  const minFare = 3;
+  const minFare = 10;
   const price = Math.max(rawPrice * competitiveDiscount, minFare);
   return { price, baseFare };
 };
 
 const generateSixDigitOtp = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
+  Math.floor(100000 + Math.random() * 9000).toString();
+
+const getRazorpayClient = () => {
+  const keyId = process.env.RZP_KEY_ID;
+  const keySecret = process.env.RZP_KEY_TEST;
+  if (!keyId || !keySecret) {
+    throw new Error("Razorpay keys are missing");
+  }
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+};
+
+const verifyRazorpaySignature = ({ orderId, paymentId, signature }) => {
+  const secret = process.env.RZP_KEY_TEST || "";
+  const body = `${orderId}|${paymentId}`;
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(body)
+    .digest("hex");
+  return expected === signature;
+};
 
 export const createRide = async (req, res) => {
   const { pickuppoint, destination, time, date, seats } = req.body;
@@ -406,7 +427,12 @@ export const completeBooking = async (req, res) => {
 
 export const payForBooking = async (req, res) => {
   const { id } = req.params;
-  const { bookingId } = req.body;
+  const {
+    bookingId,
+    razorpayPaymentId,
+    razorpayOrderId,
+    razorpaySignature,
+  } = req.body;
   const userId = req.user?.id;
   if (!bookingId) {
     return res.status(400).json({ error: "bookingId is required" });
@@ -422,9 +448,65 @@ export const payForBooking = async (req, res) => {
     if (!booking || String(booking.userId) !== String(userId)) {
       return res.status(404).json({ error: "booking not found" });
     }
-    booking.paymentStatus = "paid";
+    if (booking.status !== "completed") {
+      return res.status(400).json({ error: "booking not completed" });
+    }
+    if (
+      razorpayPaymentId &&
+      razorpayOrderId &&
+      razorpaySignature
+    ) {
+      const valid = verifyRazorpaySignature({
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+      });
+      if (!valid) {
+        return res.status(400).json({ error: "invalid payment signature" });
+      }
+      booking.paymentStatus = "paid";
+      booking.paymentId = razorpayPaymentId;
+      booking.paymentOrderId = razorpayOrderId;
+      booking.paymentSignature = razorpaySignature;
+      booking.paidAt = new Date();
+      await ride.save();
+      return res.status(200).json({ message: "payment completed", booking });
+    }
+
+    if (booking.paymentStatus === "paid") {
+      return res.status(200).json({ message: "already paid", booking });
+    }
+
+    const seatCount = Number(booking.seats || 1);
+    const basePrice = Number(ride.price || 0);
+    const amount = Math.round(basePrice * seatCount * 100);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "invalid amount" });
+    }
+
+    const razorpay = getRazorpayClient();
+    const order = await razorpay.orders.create({
+      amount,
+      currency: "INR",
+      receipt: `booking_${booking._id}`,
+      notes: {
+        rideId: String(ride._id),
+        bookingId: String(booking._id),
+        userId: String(userId),
+      },
+    });
+
+    booking.paymentOrderId = order.id;
+    booking.paymentAmount = amount;
     await ride.save();
-    return res.status(200).json({ message: "payment completed", booking });
+
+    return res.status(200).json({
+      keyId: process.env.RZP_KEY_ID,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      bookingId: booking._id,
+    });
   } catch (e) {
     console.log(e, "error while paying for ride");
     return res.status(500).json({ error: "error while paying for ride" });

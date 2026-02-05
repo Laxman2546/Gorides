@@ -33,6 +33,19 @@ function debounce(func, wait) {
   };
 }
 
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8";
 
 export default function GoRidesLanding() {
@@ -45,6 +58,9 @@ export default function GoRidesLanding() {
   const [expandedRide, setExpandedRide] = useState(null);
   const [expandedBookingsRide, setExpandedBookingsRide] = useState(null);
   const [routeCache, setRouteCache] = useState({});
+  const otpRequestedRef = useRef(new Set());
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState("");
 
   // USER
   const [captainData, setCaptainData] = useState(null);
@@ -140,6 +156,14 @@ export default function GoRidesLanding() {
       ride.captainId?.userId?._id ||
       ride.captainId?.userId ||
       ride.captainUserId;
+    const captainLocation =
+      ride.captainLocation ||
+      ride.captainId?.location ||
+      ride.captainId?.userId?.location;
+    const riderLocation =
+      ride.riderLocation ||
+      ride.booking?.userId?.location ||
+      ride.userId?.location;
     return {
       id: ride._id || ride.id,
       route: [ride.pickuppoint, ride.destination].filter(Boolean),
@@ -154,12 +178,17 @@ export default function GoRidesLanding() {
       pickupPoint: ride.pickuppoint,
       dropPoint: ride.destination,
       captainUserId,
+      captainLocation,
+      riderLocation,
       bookingStatus: booking?.status || (isBooking ? "confirmed" : undefined),
       bookingId: booking?._id || (isBooking ? ride._id || ride.id : undefined),
       bookingSeats,
       bookingOtp: booking?.otp,
+      vehicleNumber: ride.captainId?.vehicleNumber,
       bookingOtpExpires: booking?.otpExpires,
-      paymentStatus: booking?.paymentStatus || (isBooking ? "pending" : undefined),
+      phone:ride.captainId?.userId?.phone,
+      paymentStatus:
+        booking?.paymentStatus || (isBooking ? "pending" : undefined),
       totalAmount: booking
         ? formatPrice(Number(ride.price || 0) * bookingSeats)
         : isBooking
@@ -288,6 +317,22 @@ export default function GoRidesLanding() {
     if (storedUser) {
       getUserData();
       refreshRides();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          },
+          () => {
+            setLocationError("Unable to access your current location.");
+          },
+          { enableHighAccuracy: true, timeout: 8000 },
+        );
+      } else {
+        setLocationError("Location not supported on this device.");
+      }
     }
   }, []);
 
@@ -307,6 +352,16 @@ export default function GoRidesLanding() {
 
     return () => clearInterval(interval);
   }, [captainData]);
+
+  useEffect(() => {
+    myBookedRides.forEach((ride) => {
+      if (ride.bookingStatus !== "confirmed") return;
+      if (ride.bookingOtp) return;
+      if (otpRequestedRef.current.has(ride.id)) return;
+      otpRequestedRef.current.add(ride.id);
+      generateRideOtp(ride);
+    });
+  }, [myBookedRides]);
   // FILTER
   // const filteredRides = rides.filter((ride) =>
   //   ride.route.some((city) =>
@@ -457,13 +512,64 @@ export default function GoRidesLanding() {
 
   const payForRide = async (ride) => {
     try {
-      await axios.post(
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load Razorpay. Please try again.");
+        return;
+      }
+
+      const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${ride.id}/pay`,
         { bookingId: ride.bookingId },
         { withCredentials: true },
       );
-      toast.success("Payment completed");
-      refreshRides();
+      const { keyId, orderId, amount, currency } = response.data || {};
+      if (!orderId || !keyId) {
+        toast.error("Unable to start payment. Try again.");
+        return;
+      }
+
+      const options = {
+        key: keyId,
+        amount,
+        currency,
+        name: "GoRides",
+        description: "Ride payment",
+        order_id: orderId,
+        prefill: {
+          name: user.name || "Rider",
+          email: user.emailid || "",
+          contact: user.phone || "",
+        },
+        handler: async (payment) => {
+          try {
+            await axios.post(
+              `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${ride.id}/pay`,
+              {
+                bookingId: ride.bookingId,
+                razorpayPaymentId: payment.razorpay_payment_id,
+                razorpayOrderId: payment.razorpay_order_id,
+                razorpaySignature: payment.razorpay_signature,
+              },
+              { withCredentials: true },
+            );
+            toast.success("Payment completed");
+            refreshRides();
+          } catch (e) {
+            console.error("Error verifying payment:", e);
+            toast.error(e.response?.data?.error || "Payment verification failed");
+          }
+        },
+        theme: {
+          color: "#10b981",
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on("payment.failed", (resp) => {
+        toast.error(resp.error?.description || "Payment failed");
+      });
+      razorpay.open();
     } catch (e) {
       console.error("Error paying for ride:", e);
       toast.error(e.response?.data?.error || "Failed to pay");
@@ -648,6 +754,7 @@ export default function GoRidesLanding() {
   };
 
   const searchTerm = search.trim().toLowerCase();
+  const isVerifiedCaptain = captainData?.status === "approved";
   const bookedRideIds = new Set(
     myBookedRides
       .filter((ride) => ride.bookingStatus && ride.bookingStatus !== "pending")
@@ -658,11 +765,42 @@ export default function GoRidesLanding() {
         ride.route.some((city) => city.toLowerCase().includes(searchTerm)),
       )
     : upcomingRides;
+  const visibleCaptainCreatedRides = visibleUpcomingRides.filter(
+    (ride) => user.id && ride.captainUserId === user.id,
+  );
+  const visibleAvailableRides = visibleUpcomingRides.filter(
+    (ride) => !user.id || ride.captainUserId !== user.id,
+  );
 
   const filteredRides =
-    activeTab === "upcoming"
-      ? visibleUpcomingRides.filter((ride) => !bookedRideIds.has(ride.id))
-      : myBookedRides;
+    activeTab === "my-created"
+      ? visibleCaptainCreatedRides
+      : activeTab === "upcoming"
+        ? visibleAvailableRides.filter((ride) => !bookedRideIds.has(ride.id))
+        : myBookedRides;
+  const emptyState =
+    activeTab === "my-created"
+      ? {
+          title: "No created rides yet",
+          subtitle: "Publish a ride to see it here",
+        }
+      : activeTab === "my-rides"
+        ? {
+            title: "No booked rides yet",
+            subtitle: "Book a ride to see it here",
+          }
+        : {
+            title: "No rides found",
+            subtitle: "Try searching for a different route",
+          };
+
+  useEffect(() => {
+    if (isVerifiedCaptain) {
+      setActiveTab((prev) => (prev === "upcoming" ? "my-created" : prev));
+      return;
+    }
+    setActiveTab((prev) => (prev === "my-created" ? "upcoming" : prev));
+  }, [isVerifiedCaptain]);
 
   return (
     <>
@@ -858,6 +996,21 @@ export default function GoRidesLanding() {
                       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
                     )}
                   </button>
+                  {isVerifiedCaptain && (
+                    <button
+                      onClick={() => setActiveTab("my-created")}
+                      className={`flex-1 py-3 text-sm font-semibold transition-all relative ${
+                        activeTab === "my-created"
+                          ? "text-emerald-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Created Rides
+                      {activeTab === "my-created" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveTab("my-rides")}
                     className={`flex-1 py-3 text-sm font-semibold transition-all relative ${
@@ -924,6 +1077,8 @@ export default function GoRidesLanding() {
                         key={ride.id}
                         ride={ride}
                         isCaptainOwner={isCaptainOwner}
+                        userLocation={userLocation}
+                        locationError={locationError}
                         expanded={expandedRide === ride.id}
                         bookingsExpanded={expandedBookingsRide === ride.id}
                         onToggleExpand={() =>
@@ -964,9 +1119,9 @@ export default function GoRidesLanding() {
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Search size={32} className="text-gray-400" />
                   </div>
-                  <p className="text-gray-500">No rides found</p>
+                  <p className="text-gray-500">{emptyState.title}</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    Try searching for a different route
+                    {emptyState.subtitle}
                   </p>
                 </div>
               ) : null}
