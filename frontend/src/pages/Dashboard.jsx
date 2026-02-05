@@ -79,6 +79,23 @@ export default function GoRidesLanding() {
       date: "2026-02-03",
       day: "Monday",
     },
+    {
+      id: 2,
+      route: ["Madhapur", "Gachibowli"],
+      time: "10:30 AM",
+      seats: 1,
+      date: "2026-02-03",
+      day: "Monday",
+    },
+    {
+      id: 3,
+      route: ["Madhapur", "Gachibowli"],
+      time: "11:30 AM",
+      seats: 1,
+      date: "2026-02-03",
+      day: "Monday",
+    },
+
   ]);
 
   // ==============================
