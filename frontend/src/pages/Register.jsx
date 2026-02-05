@@ -222,7 +222,7 @@ const Register = () => {
                   className="w-full bg-emerald-500 text-white py-3.5 rounded-xl font-semibold hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {loading ? (
-                    <>
+                    <> 
                       <Loader2 className="animate-spin" size={20} />
                       <span>Creating Account...</span>
                     </>
