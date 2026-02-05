@@ -22,6 +22,55 @@ const rideSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  seats: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+  bookedSeats: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  passengers: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: "User",
+    default: [],
+  },
+  bookings: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      seats: {
+        type: Number,
+        default: 1,
+        min: 1,
+      },
+      status: {
+        type: String,
+        enum: ["pending", "confirmed", "ongoing", "completed", "cancelled", "declined"],
+        default: "pending",
+      },
+      otp: {
+        type: String,
+      },
+      otpExpires: {
+        type: Date,
+      },
+      paymentStatus: {
+        type: String,
+        enum: ["pending", "paid"],
+        default: "pending",
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   price: {
     type: Number,
   },
@@ -44,3 +93,5 @@ const rideSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+export default mongoose.model("Ride", rideSchema);

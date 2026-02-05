@@ -30,7 +30,7 @@ export const getAddressCoordinates = async (address) => {
 
 export const getDistanceTime = async (origin, destination) => {
   if (!origin || !destination) {
-    return res.status(400).json({ error: "origin or distance required" });
+    throw new Error("origin or destination required");
   }
   try {
     const response = await axios.get(
