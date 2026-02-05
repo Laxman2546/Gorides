@@ -47,6 +47,7 @@ const loadRazorpayScript = () =>
   });
 
 const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8";
+const GOOGLE_MAPS_LIBRARIES = ["places"];
 
 export default function GoRidesLanding() {
   const [screen, setScreen] = useState("home");
@@ -96,7 +97,7 @@ export default function GoRidesLanding() {
   // GOOGLE MAPS LOADER
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_KEY,
-    libraries: ["places"],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   // RIDES
@@ -186,7 +187,7 @@ export default function GoRidesLanding() {
       bookingOtp: booking?.otp,
       vehicleNumber: ride.captainId?.vehicleNumber,
       bookingOtpExpires: booking?.otpExpires,
-      phone:ride.captainId?.userId?.phone,
+      phone: ride.captainId?.userId?.phone,
       paymentStatus:
         booking?.paymentStatus || (isBooking ? "pending" : undefined),
       totalAmount: booking
@@ -244,7 +245,6 @@ export default function GoRidesLanding() {
         withCredentials: true,
       },
     );
-    console.log(response.data, "iam upcoming rides");
     return response.data.map((ride) => normalizeRide(ride));
   };
 
@@ -557,7 +557,9 @@ export default function GoRidesLanding() {
             refreshRides();
           } catch (e) {
             console.error("Error verifying payment:", e);
-            toast.error(e.response?.data?.error || "Payment verification failed");
+            toast.error(
+              e.response?.data?.error || "Payment verification failed",
+            );
           }
         },
         theme: {
@@ -769,7 +771,8 @@ export default function GoRidesLanding() {
     (ride) => user.id && ride.captainUserId === user.id,
   );
   const visibleAvailableRides = visibleUpcomingRides.filter(
-    (ride) => !user.id || ride.captainUserId !== user.id,
+    (ride) =>
+      (!user.id || ride.captainUserId !== user.id) && Number(ride.seats) > 0,
   );
 
   const filteredRides =
@@ -1245,6 +1248,7 @@ export default function GoRidesLanding() {
                     <button
                       className="w-full bg-emerald-500 text-white py-3 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
                       onClick={sendOtp}
+                      disabled={loading}
                     >
                       {loading ? "sending otp..." : "Verify Email"}
                     </button>
