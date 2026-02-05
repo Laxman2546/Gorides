@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-
+import axios from "axios";
 export default function AdminDashboard() {
   const [requests, setRequests] = useState([]);
 
@@ -19,17 +19,47 @@ export default function AdminDashboard() {
         status: "pending",
       },
     ]);
+    getCaptainData();
   }, []);
-
-  const updateStatus = (id, status) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status } : r))
-    );
-
-    toast.success(`Request ${status}`);
-
-    // later backend API here
-    // fetch("/admin/update", { method:"POST", body: JSON.stringify({id,status}) })
+  const getCaptainData = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/admin/getCaptain`,
+        {
+          withCredentials: true,
+        },
+      );
+      console.log(response.data);
+      const data = response.data;
+      const formattedRequests = data.map((captain) => ({
+        id: captain._id,
+        name: captain.userId.username,
+        phone: captain.userId.phone,
+        dlNumber: captain.licenceNumber,
+        vehicleName: captain.vehicleName,
+        vehicleNumber: captain.vehicleNumber,
+        status: captain.status,
+      }));
+      setRequests(formattedRequests);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+  const updateStatus = async (id, status) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/admin/update`,
+        { id, status },
+        { withCredentials: true }
+      );
+      setRequests((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status } : r))
+      );
+      toast.success(`Request ${status}`);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error(error?.response?.data?.error || "Failed to update status");
+    }
   };
 
   return (
@@ -42,12 +72,24 @@ export default function AdminDashboard() {
           className="bg-white p-4 rounded shadow mb-3 flex justify-between items-center"
         >
           <div>
-            <p><b>Name:</b> {r.name}</p>
-            <p><b>Phone:</b> {r.phone}</p>
-            <p><b>DL:</b> {r.dlNumber}</p>
-            <p><b>Vehicle:</b> {r.vehicleName}</p>
-            <p><b>Number:</b> {r.vehicleNumber}</p>
-            <p><b>Status:</b> {r.status}</p>
+            <p>
+              <b>Name:</b> {r.name}
+            </p>
+            <p>
+              <b>Phone:</b> {r.phone}
+            </p>
+            <p>
+              <b>DL:</b> {r.dlNumber}
+            </p>
+            <p>
+              <b>Vehicle:</b> {r.vehicleName}
+            </p>
+            <p>
+              <b>Number:</b> {r.vehicleNumber}
+            </p>
+            <p>
+              <b>Status:</b> {r.status}
+            </p>
           </div>
 
           <div className="space-y-2">

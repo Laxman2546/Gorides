@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import captianModel from "../models/captainModel.js";
 export const createUser = async (req, res) => {
   const { username, emailid, password } = req.body;
   if (!username || !emailid || !password) {
@@ -19,7 +20,11 @@ export const createUser = async (req, res) => {
       emailid,
       password: hashedPassword,
     });
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { id: user._id, emailid: user.emailid },
+      process.env.JWT_SECRET,
+    );
+    console.log("iam token", token);
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
@@ -52,7 +57,10 @@ export const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ error: "invalid credentials" });
     }
-    const token = jwt.sign({ id: isExist._id }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { id: isExist._id, emailid: isExist.emailid },
+      process.env.JWT_SECRET,
+    );
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
@@ -60,13 +68,11 @@ export const loginUser = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
       expires: new Date(Date.now() + 9000000),
     });
-    return res
-      .status(200)
-      .json({
-        message: "user logged in successfully",
-        username: isExist.username,
-        emailid: isExist.emailid,
-      });
+    return res.status(200).json({
+      message: "user logged in successfully",
+      username: isExist.username,
+      emailid: isExist.emailid,
+    });
   } catch (e) {
     console.log(e, "error while login user");
     return res
@@ -111,7 +117,7 @@ export const sendEmailOtp = async (req, res) => {
 };
 
 export const verifyEmailOtp = async (req, res) => {
-  const { emailid, otp } = req.body;
+  const { emailid, otp, phone } = req.body;
   try {
     const user = await userModel.findOne({ emailid });
     if (!user) {
@@ -122,14 +128,45 @@ export const verifyEmailOtp = async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired OTP" });
     }
 
-    user.isEmailVerified = true;
-    user.emailOtp = undefined;
-    user.emailOtpExpires = undefined;
+    await userModel.findOneAndUpdate(
+      { emailid },
+      {
+        $set: {
+          isEmailVerified: true,
+          phone: phone,
+          emailOtp: undefined,
+          emailOtpExpires: undefined,
+        },
+      },
+    );
+
     await user.save();
 
     res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("Error verifying OTP:", error);
     res.status(500).json({ error: "Error verifying OTP" });
+  }
+};
+
+export const getUserData = async (req, res) => {
+  const { emailid } = req.user;
+  if (!emailid) {
+    return res.status(400).json({ error: "emailid is required" });
+  }
+  try {
+    const user = await userModel.findOne({ emailid });
+    if (!user) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const captain = await captianModel.findOne({ userId: user._id });
+    const userData = {
+      ...user.toObject(),
+      captain: captain ? captain.toObject() : null,
+    };
+    return res.status(200).json(userData);
+  } catch (e) {
+    console.log(e, "error while getting user data");
+    return res.status(500).json({ error: "error while getting user data" });
   }
 };
