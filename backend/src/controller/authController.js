@@ -3,6 +3,15 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
 import captianModel from "../models/captainModel.js";
+
+const isProd = process.env.NODE_ENV === "production";
+const baseCookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
+  maxAge: 24 * 60 * 60 * 1000,
+  expires: new Date(Date.now() + 9000000),
+};
 export const createUser = async (req, res) => {
   const { username, emailid, password } = req.body;
   if (!username || !emailid || !password) {
@@ -25,13 +34,7 @@ export const createUser = async (req, res) => {
       process.env.JWT_SECRET,
     );
     console.log("iam token", token);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
-      expires: new Date(Date.now() + 9000000),
-    });
+    res.cookie("token", token, baseCookieOptions);
     return res
       .status(201)
       .json({ message: "user created successfully", username: user.username });
@@ -61,13 +64,7 @@ export const loginUser = async (req, res) => {
       { id: isExist._id, emailid: isExist.emailid },
       process.env.JWT_SECRET,
     );
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
-      expires: new Date(Date.now() + 9000000),
-    });
+    res.cookie("token", token, baseCookieOptions);
     return res.status(200).json({
       message: "user logged in successfully",
       username: isExist.username,
@@ -85,7 +82,11 @@ import { sendEmail } from "../utilis/mail.js";
 
 export const logoutUser = async (req, res) => {
   try {
-    res.cookie("token", "", { expires: new Date(0) });
+    res.cookie("token", "", {
+      ...baseCookieOptions,
+      maxAge: 0,
+      expires: new Date(0),
+    });
     return res.status(200).json("sucessfully logout");
   } catch (e) {
     return res.status(500).json({ error: "internal server error,try again!" });

@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import {
-  GoogleMap,
-  Marker,
-  Polyline,
-  useJsApiLoader,
-} from "@react-google-maps/api";
+import { useJsApiLoader } from "@react-google-maps/api";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { all } from "axios";
@@ -15,18 +10,16 @@ import {
   User,
   Calendar,
   Clock,
-  Users,
   Car,
   Phone,
   Mail,
   Plus,
   X,
   Shield,
-  ChevronDown,
   Search,
-  Navigation,
 } from "lucide-react";
 import axios from "axios";
+import RideCard from "../components/RideCard.jsx";
 
 function debounce(func, wait) {
   let timeout;
@@ -40,20 +33,39 @@ function debounce(func, wait) {
   };
 }
 
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8";
 
 export default function GoRidesLanding() {
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("find");
+  const [activeTab, setActiveTab] = useState("upcoming");
   const [showProfile, setShowProfile] = useState(false);
 
   // MAP EXPAND STATE
   const [expandedRide, setExpandedRide] = useState(null);
+  const [expandedBookingsRide, setExpandedBookingsRide] = useState(null);
   const [routeCache, setRouteCache] = useState({});
+  const otpRequestedRef = useRef(new Set());
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState("");
 
   // USER
   const [captainData, setCaptainData] = useState(null);
   const [user, setUser] = useState({
+    id: "",
     name: "Guest User",
     phone: "",
     emailid: "",
@@ -72,6 +84,7 @@ export default function GoRidesLanding() {
   const [time, setTime] = useState("");
   const [seats, setSeats] = useState(1);
   const [date, setDate] = useState("");
+  const [loading, setLoading] = useState(false);
   const [dlNumber, setDlNumber] = useState("");
 
   // OTP
@@ -87,33 +100,11 @@ export default function GoRidesLanding() {
   });
 
   // RIDES
-  const [rides, setRides] = useState([
-    {
-      id: 1,
-      route: ["Madhapur", "Gachibowli"],
-      time: "9:30 AM",
-      seats: 1,
-      date: "2026-02-03",
-      day: "Monday",
-    },
-    {
-      id: 2,
-      route: ["Madhapur", "Gachibowli"],
-      time: "10:30 AM",
-      seats: 1,
-      date: "2026-02-03",
-      day: "Monday",
-    },
-    {
-      id: 3,
-      route: ["Madhapur", "Gachibowli"],
-      time: "11:30 AM",
-      seats: 1,
-      date: "2026-02-03",
-      day: "Monday",
-    },
-
-  ]);
+  const [upcomingRides, setUpcomingRides] = useState([]);
+  const [myBookedRides, setMyBookedRides] = useState([]);
+  const [ridesLoading, setRidesLoading] = useState(false);
+  const [ridesError, setRidesError] = useState("");
+  const [captainRideBookings, setCaptainRideBookings] = useState({});
 
   // GEO HELPERS
   const geocodeCity = async (city) => {
@@ -147,21 +138,64 @@ export default function GoRidesLanding() {
     return points;
   };
 
-  // MOCK REALTIME SEATS
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRides((prev) =>
-        prev.map((r) => ({
-          ...r,
-          seats:
-            r.seats > 0
-              ? Math.max(0, r.seats - (Math.random() > 0.7 ? 1 : 0))
-              : r.seats,
-        })),
-      );
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  const formatPrice = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return "₹--";
+    }
+    return `₹${Number(value).toFixed(0)}`;
+  };
+
+  const normalizeRide = (ride, options = {}) => {
+    const isBooking = options.isBooking === true;
+    const seatsTotal = Number(ride.seats || 0);
+    const bookedSeats = Number(ride.bookedSeats || 0);
+    const availableSeats = Math.max(0, seatsTotal - bookedSeats);
+    const booking = ride.booking || null;
+    const bookingSeats = booking?.seats || 0;
+    const captainUserId =
+      ride.captainId?.userId?._id ||
+      ride.captainId?.userId ||
+      ride.captainUserId;
+    const captainLocation =
+      ride.captainLocation ||
+      ride.captainId?.location ||
+      ride.captainId?.userId?.location;
+    const riderLocation =
+      ride.riderLocation ||
+      ride.booking?.userId?.location ||
+      ride.userId?.location;
+    return {
+      id: ride._id || ride.id,
+      route: [ride.pickuppoint, ride.destination].filter(Boolean),
+      time: ride.time,
+      date: ride.date,
+      day: getDayFromDate(ride.date),
+      seats: availableSeats,
+      bookedSeats: bookingSeats || bookedSeats,
+      driver: ride.captainId?.userId?.username || "Captain",
+      vehicle: ride.captainId?.vehicleName || "Bike",
+      price: formatPrice(ride.price),
+      pickupPoint: ride.pickuppoint,
+      dropPoint: ride.destination,
+      captainUserId,
+      captainLocation,
+      riderLocation,
+      bookingStatus: booking?.status || (isBooking ? "confirmed" : undefined),
+      bookingId: booking?._id || (isBooking ? ride._id || ride.id : undefined),
+      bookingSeats,
+      bookingOtp: booking?.otp,
+      vehicleNumber: ride.captainId?.vehicleNumber,
+      bookingOtpExpires: booking?.otpExpires,
+      phone:ride.captainId?.userId?.phone,
+      paymentStatus:
+        booking?.paymentStatus || (isBooking ? "pending" : undefined),
+      totalAmount: booking
+        ? formatPrice(Number(ride.price || 0) * bookingSeats)
+        : isBooking
+          ? formatPrice(ride.price)
+          : undefined,
+    };
+  };
 
   // LOAD USER
   useEffect(() => {
@@ -186,6 +220,7 @@ export default function GoRidesLanding() {
       const data = response.data;
       setUser((prevUser) => ({
         ...prevUser,
+        id: data._id || prevUser.id,
         name: data.username || prevUser.name,
         emailid: data.emailid || prevUser.emailid,
         phone: data.phone || prevUser.phone,
@@ -202,18 +237,137 @@ export default function GoRidesLanding() {
     }
   };
 
+  const fetchUpcomingRides = async () => {
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/rides/list`,
+      {
+        withCredentials: true,
+      },
+    );
+    console.log(response.data, "iam upcoming rides");
+    return response.data.map((ride) => normalizeRide(ride));
+  };
+
+  const fetchMyBookings = async () => {
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/rides/my`,
+      {
+        withCredentials: true,
+      },
+    );
+    return response.data.map((ride) =>
+      normalizeRide(ride, { isBooking: true }),
+    );
+  };
+
+  const fetchCaptainBookings = async () => {
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/rides/captain/bookings`,
+      {
+        withCredentials: true,
+      },
+    );
+    return response.data;
+  };
+
+  const refreshCaptainBookings = async () => {
+    if (!captainData) return;
+    try {
+      const rides = await fetchCaptainBookings();
+      const map = rides.reduce((acc, ride) => {
+        acc[ride._id] = ride.bookings || [];
+        return acc;
+      }, {});
+      setCaptainRideBookings(map);
+    } catch (e) {
+      console.error("Error fetching captain bookings:", e);
+    }
+  };
+
+  const refreshRides = async (options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) {
+      setRidesLoading(true);
+      setRidesError("");
+    }
+    try {
+      const [upcoming, myBookings] = await Promise.all([
+        fetchUpcomingRides(),
+        fetchMyBookings(),
+      ]);
+      setUpcomingRides(upcoming);
+      setMyBookedRides(myBookings);
+      if (captainData) {
+        refreshCaptainBookings();
+      }
+    } catch (e) {
+      console.error("Error fetching rides:", e);
+      if (!silent) {
+        setRidesError("Unable to load rides right now");
+      }
+    } finally {
+      if (!silent) {
+        setRidesLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       getUserData();
+      refreshRides();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          },
+          () => {
+            setLocationError("Unable to access your current location.");
+          },
+          { enableHighAccuracy: true, timeout: 8000 },
+        );
+      } else {
+        setLocationError("Location not supported on this device.");
+      }
     }
   }, []);
+
+  useEffect(() => {
+    if (captainData) {
+      refreshCaptainBookings();
+    }
+  }, [captainData]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (!storedUser) return;
+
+    const interval = setInterval(() => {
+      refreshRides({ silent: true });
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [captainData]);
+
+  useEffect(() => {
+    myBookedRides.forEach((ride) => {
+      if (ride.bookingStatus !== "confirmed") return;
+      if (ride.bookingOtp) return;
+      if (otpRequestedRef.current.has(ride.id)) return;
+      otpRequestedRef.current.add(ride.id);
+      generateRideOtp(ride);
+    });
+  }, [myBookedRides]);
   // FILTER
-  const filteredRides = rides.filter((ride) =>
-    ride.route.some((city) =>
-      city.toLowerCase().includes(search.toLowerCase()),
-    ),
-  );
+  // const filteredRides = rides.filter((ride) =>
+  //   ride.route.some((city) =>
+  //     city.toLowerCase().includes(search.toLowerCase()),
+  //   ),
+  // );
 
   // HELPERS
   const getLogOut = () => {
@@ -270,7 +424,13 @@ export default function GoRidesLanding() {
     return d.toLocaleDateString("en-US", options);
   };
 
-  const publishRide = () => {
+  const getShortCity = (value) => {
+    if (!value || typeof value !== "string") return value;
+    const [first] = value.split(",");
+    return first?.trim() || value;
+  };
+
+  const publishRide = async () => {
     if (captainData?.status !== "approved")
       return toast.error("Captain must be approved before creating rides");
 
@@ -279,32 +439,209 @@ export default function GoRidesLanding() {
 
     if (!date) return toast.error("Please select a date");
 
-    const newRide = {
-      id: Date.now(),
-      route: [fromCity, ...viaCities, toCity],
-      time: time || "Anytime",
-      seats: Number(seats),
-      date: date,
-      day: getDayFromDate(date),
-    };
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/create`,
+        {
+          pickuppoint: fromCity,
+          destination: toCity,
+          time: time || "Anytime",
+          date,
+          seats: Number(seats),
+        },
+        {
+          withCredentials: true,
+        },
+      );
+      const createdRide = normalizeRide(response.data);
+      setUpcomingRides((prev) => [createdRide, ...prev]);
+      setFromCity("");
+      setToCity("");
+      setViaCities([]);
+      setTime("");
+      setSeats(1);
+      setDate("");
 
-    setRides([newRide, ...rides]);
-    setFromCity("");
-    setToCity("");
-    setViaCities([]);
-    setTime("");
-    setSeats(1);
-    setDate("");
-
-    toast.success("Ride Published Successfully 🚀");
+      toast.success("Ride Published Successfully");
+    } catch (e) {
+      console.error("Error publishing ride:", e);
+      toast.error(e.response?.data?.error || "Failed to publish ride");
+    }
   };
 
-  const joinRide = (ride) => {
+  const joinRide = async (ride) => {
     if (!user.emailVerifed || !user.phone) {
       setShowProfile(true);
       return toast.error("Please verify profile before joining rides");
     }
-    toast.success(`Join request sent for ${ride.route.join(" → ")}`);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/book/${ride.id}`,
+        { seats: 1 },
+        { withCredentials: true },
+      );
+      toast.success(
+        `Ride booked for ${ride.route.map(getShortCity).join(" -> ")}`,
+      );
+      refreshRides();
+    } catch (e) {
+      console.error("Error booking ride:", e);
+      toast.error(e.response?.data?.error || "Failed to book ride");
+    }
+  };
+
+  const generateRideOtp = async (ride) => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${ride.id}/otp`,
+        {},
+        { withCredentials: true },
+      );
+      const { otp } = response.data;
+      setMyBookedRides((prev) =>
+        prev.map((item) =>
+          item.id === ride.id ? { ...item, bookingOtp: otp } : item,
+        ),
+      );
+      toast.success("OTP generated");
+    } catch (e) {
+      console.error("Error generating OTP:", e);
+      toast.error(e.response?.data?.error || "Failed to generate OTP");
+    }
+  };
+
+  const payForRide = async (ride) => {
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load Razorpay. Please try again.");
+        return;
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${ride.id}/pay`,
+        { bookingId: ride.bookingId },
+        { withCredentials: true },
+      );
+      const { keyId, orderId, amount, currency } = response.data || {};
+      if (!orderId || !keyId) {
+        toast.error("Unable to start payment. Try again.");
+        return;
+      }
+
+      const options = {
+        key: keyId,
+        amount,
+        currency,
+        name: "GoRides",
+        description: "Ride payment",
+        order_id: orderId,
+        prefill: {
+          name: user.name || "Rider",
+          email: user.emailid || "",
+          contact: user.phone || "",
+        },
+        handler: async (payment) => {
+          try {
+            await axios.post(
+              `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${ride.id}/pay`,
+              {
+                bookingId: ride.bookingId,
+                razorpayPaymentId: payment.razorpay_payment_id,
+                razorpayOrderId: payment.razorpay_order_id,
+                razorpaySignature: payment.razorpay_signature,
+              },
+              { withCredentials: true },
+            );
+            toast.success("Payment completed");
+            refreshRides();
+          } catch (e) {
+            console.error("Error verifying payment:", e);
+            toast.error(e.response?.data?.error || "Payment verification failed");
+          }
+        },
+        theme: {
+          color: "#10b981",
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on("payment.failed", (resp) => {
+        toast.error(resp.error?.description || "Payment failed");
+      });
+      razorpay.open();
+    } catch (e) {
+      console.error("Error paying for ride:", e);
+      toast.error(e.response?.data?.error || "Failed to pay");
+    }
+  };
+
+  const startRideBooking = async (rideId, bookingId, otp) => {
+    if (!otp) {
+      toast.error("Please enter OTP");
+      return;
+    }
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${rideId}/start`,
+        { bookingId, otp },
+        { withCredentials: true },
+      );
+      toast.success("Ride started");
+      refreshCaptainBookings();
+      refreshRides();
+    } catch (e) {
+      console.error("Error starting ride:", e);
+      toast.error(e.response?.data?.error || "Failed to start ride");
+    }
+  };
+
+  const completeRideBooking = async (rideId, bookingId) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${rideId}/complete`,
+        { bookingId },
+        { withCredentials: true },
+      );
+      toast.success("Ride completed");
+      refreshCaptainBookings();
+      refreshRides();
+    } catch (e) {
+      console.error("Error completing ride:", e);
+      toast.error(e.response?.data?.error || "Failed to complete ride");
+    }
+  };
+
+  const acceptRideBooking = async (rideId, bookingId) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${rideId}/accept`,
+        { bookingId },
+        { withCredentials: true },
+      );
+      toast.success("Booking accepted");
+      refreshCaptainBookings();
+      refreshRides();
+    } catch (e) {
+      console.error("Error accepting booking:", e);
+      toast.error(e.response?.data?.error || "Failed to accept booking");
+    }
+  };
+
+  const declineRideBooking = async (rideId, bookingId) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/rides/booking/${rideId}/decline`,
+        { bookingId },
+        { withCredentials: true },
+      );
+      toast.success("Booking declined");
+      refreshCaptainBookings();
+      refreshRides();
+    } catch (e) {
+      console.error("Error declining booking:", e);
+      toast.error(e.response?.data?.error || "Failed to decline booking");
+    }
   };
 
   const sendOtp = async () => {
@@ -317,8 +654,8 @@ export default function GoRidesLanding() {
       toast.error("Email not found");
       return;
     }
-
     try {
+      setLoading(true);
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
         {
@@ -338,6 +675,8 @@ export default function GoRidesLanding() {
       }
     } catch (error) {
       toast.error("Error sending OTP");
+    } finally {
+      setLoading(false);
     }
   };
   const verifyOtp = async () => {
@@ -346,6 +685,7 @@ export default function GoRidesLanding() {
       return;
     }
     try {
+      setLoading(true);
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/auth/api/verifyotp`,
         {
@@ -371,6 +711,8 @@ export default function GoRidesLanding() {
     } catch (error) {
       console.error(error, "error while verifying otp");
       toast.error("Error verifying OTP: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
   const handleCaptainApproval = () => {
@@ -411,12 +753,60 @@ export default function GoRidesLanding() {
     }
   };
 
+  const searchTerm = search.trim().toLowerCase();
+  const isVerifiedCaptain = captainData?.status === "approved";
+  const bookedRideIds = new Set(
+    myBookedRides
+      .filter((ride) => ride.bookingStatus && ride.bookingStatus !== "pending")
+      .map((ride) => ride.id),
+  );
+  const visibleUpcomingRides = searchTerm
+    ? upcomingRides.filter((ride) =>
+        ride.route.some((city) => city.toLowerCase().includes(searchTerm)),
+      )
+    : upcomingRides;
+  const visibleCaptainCreatedRides = visibleUpcomingRides.filter(
+    (ride) => user.id && ride.captainUserId === user.id,
+  );
+  const visibleAvailableRides = visibleUpcomingRides.filter(
+    (ride) => !user.id || ride.captainUserId !== user.id,
+  );
+
+  const filteredRides =
+    activeTab === "my-created"
+      ? visibleCaptainCreatedRides
+      : activeTab === "upcoming"
+        ? visibleAvailableRides.filter((ride) => !bookedRideIds.has(ride.id))
+        : myBookedRides;
+  const emptyState =
+    activeTab === "my-created"
+      ? {
+          title: "No created rides yet",
+          subtitle: "Publish a ride to see it here",
+        }
+      : activeTab === "my-rides"
+        ? {
+            title: "No booked rides yet",
+            subtitle: "Book a ride to see it here",
+          }
+        : {
+            title: "No rides found",
+            subtitle: "Try searching for a different route",
+          };
+
+  useEffect(() => {
+    if (isVerifiedCaptain) {
+      setActiveTab((prev) => (prev === "upcoming" ? "my-created" : prev));
+      return;
+    }
+    setActiveTab((prev) => (prev === "my-created" ? "upcoming" : prev));
+  }, [isVerifiedCaptain]);
+
   return (
     <>
       <ToastContainer position="top-center" />
 
       <div className="min-h-screen bg-gray-50 flex flex-col relative font-sans">
-        {/* ENHANCED TOP BAR */}
         <div className="w-full bg-white shadow-sm sticky top-0 z-50">
           <div className="max-w-md mx-auto px-5 py-4 flex justify-between items-center">
             <button
@@ -445,7 +835,6 @@ export default function GoRidesLanding() {
 
         {screen === "home" && (
           <>
-            {/* MODE TOGGLE */}
             <div className="w-full max-w-md mx-auto px-5 mt-5">
               <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100">
                 <div className="grid grid-cols-2 gap-1">
@@ -476,7 +865,6 @@ export default function GoRidesLanding() {
               </div>
             </div>
 
-            {/* SEARCH / CREATE SECTION */}
             <section className="w-full max-w-md mx-auto px-5 mt-5">
               {mode === "find" ? (
                 <div className="relative">
@@ -592,186 +980,153 @@ export default function GoRidesLanding() {
               )}
             </section>
 
-            {/* RIDES LIST */}
-            <section className="w-full max-w-md mx-auto px-5 mt-5 pb-24 flex-1">
-              {mode === "find" && filteredRides.length > 0 ? (
-                <div className="space-y-4">
-                  {filteredRides.map((ride) => (
-                    <div
-                      key={ride.id}
-                      className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+            {mode === "find" && (
+              <div className="w-full max-w-md mx-auto px-5 mt-5">
+                <div className="flex gap-2 border-b border-gray-200">
+                  <button
+                    onClick={() => setActiveTab("upcoming")}
+                    className={`flex-1 py-3 text-sm font-semibold transition-all relative ${
+                      activeTab === "upcoming"
+                        ? "text-emerald-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Available Rides
+                    {activeTab === "upcoming" && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
+                    )}
+                  </button>
+                  {isVerifiedCaptain && (
+                    <button
+                      onClick={() => setActiveTab("my-created")}
+                      className={`flex-1 py-3 text-sm font-semibold transition-all relative ${
+                        activeTab === "my-created"
+                          ? "text-emerald-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
                     >
-                      {/* RIDE HEADER */}
-                      <div className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                              <span className="font-semibold text-gray-900">
-                                {ride.route[0]}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 ml-1">
-                              <div className="w-0.5 h-4 bg-gray-300 ml-0.5"></div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                              <span className="font-semibold text-gray-900">
-                                {ride.route[ride.route.length - 1]}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-900">
-                              {ride.price}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              per seat
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* RIDE DETAILS */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar size={16} className="text-gray-400" />
-                            <span>{ride.date}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Clock size={16} className="text-gray-400" />
-                            <span>{ride.time}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Users size={16} className="text-gray-400" />
-                            <span>{ride.seats} seats</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Car size={16} className="text-gray-400" />
-                            <span>{ride.vehicle}</span>
-                          </div>
-                        </div>
-
-                        {/* DRIVER INFO */}
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                              <User size={18} className="text-gray-600" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-sm text-gray-900">
-                                {ride.driver}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                ⭐ {ride.rating} • Captain
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => joinRide(ride)}
-                              className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-colors shadow-sm"
-                            >
-                              Book Now
-                            </button>
-                            <button
-                              onClick={() =>
-                                setExpandedRide(
-                                  expandedRide === ride.id ? null : ride.id,
-                                )
-                              }
-                              className="px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-                            >
-                              <ChevronDown
-                                size={18}
-                                className={`transform transition-transform ${
-                                  expandedRide === ride.id ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* EXPANDED ROUTE */}
-                      {expandedRide === ride.id && (
-                        <div className="px-5 pb-5 space-y-4">
-                          {/* Map */}
-                          <LazyRouteMap
-                            ride={ride}
-                            isLoaded={isLoaded}
-                            buildRoute={buildRoute}
-                          />
-
-                          {/* Route Details */}
-                          <div className="bg-gray-50 rounded-xl p-4">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Navigation
-                                size={16}
-                                className="text-emerald-600"
-                              />
-                              <span className="text-sm font-semibold text-gray-700">
-                                Route Stops
-                              </span>
-                            </div>
-                            <div className="space-y-3">
-                              {ride.route.map((city, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-start gap-3"
-                                >
-                                  <div className="flex flex-col items-center">
-                                    <div
-                                      className={`w-3 h-3 rounded-full ${
-                                        idx === 0
-                                          ? "bg-emerald-500"
-                                          : idx === ride.route.length - 1
-                                            ? "bg-red-500"
-                                            : "bg-gray-400"
-                                      }`}
-                                    ></div>
-                                    {idx < ride.route.length - 1 && (
-                                      <div className="w-0.5 h-8 bg-gray-300 my-1"></div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1 pb-2">
-                                    <div className="font-medium text-sm text-gray-900">
-                                      {city}
-                                    </div>
-                                    {idx === 0 && (
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        Pickup point
-                                      </div>
-                                    )}
-                                    {idx === ride.route.length - 1 && (
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        Drop point
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                      Created Rides
+                      {activeTab === "my-created" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setActiveTab("my-rides")}
+                    className={`flex-1 py-3 text-sm font-semibold transition-all relative ${
+                      activeTab === "my-rides"
+                        ? "text-emerald-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      My Rides
+                      {myBookedRides.filter(
+                        (r) => r.bookingStatus === "confirmed",
+                      ).length > 0 && (
+                        <span className="w-5 h-5 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center">
+                          {
+                            myBookedRides.filter(
+                              (r) => r.bookingStatus === "confirmed",
+                            ).length
+                          }
+                        </span>
                       )}
                     </div>
-                  ))}
+                    {activeTab === "my-rides" && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600"></div>
+                    )}
+                  </button>
                 </div>
-              ) : mode === "find" ? (
+              </div>
+            )}
+
+            <section className="w-full max-w-md mx-auto px-5 mt-5 pb-24 flex-1">
+              {mode === "find" && ridesLoading && (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search size={32} className="text-gray-400 animate-pulse" />
+                  </div>
+                  <p className="text-gray-500">Loading rides...</p>
+                </div>
+              )}
+              {mode === "find" && !ridesLoading && ridesError && (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search size={32} className="text-red-400" />
+                  </div>
+                  <p className="text-gray-500">{ridesError}</p>
+                  <button
+                    className="mt-4 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors"
+                    onClick={refreshRides}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {mode === "find" &&
+              !ridesLoading &&
+              !ridesError &&
+              filteredRides.length > 0 ? (
+                <div className="space-y-4">
+                  {filteredRides.map((ride) => {
+                    const isCaptainOwner =
+                      user.id && ride.captainUserId === user.id;
+                    return (
+                      <RideCard
+                        key={ride.id}
+                        ride={ride}
+                        isCaptainOwner={isCaptainOwner}
+                        userLocation={userLocation}
+                        locationError={locationError}
+                        expanded={expandedRide === ride.id}
+                        bookingsExpanded={expandedBookingsRide === ride.id}
+                        onToggleExpand={() =>
+                          setExpandedRide(
+                            expandedRide === ride.id ? null : ride.id,
+                          )
+                        }
+                        onToggleBookings={() =>
+                          setExpandedBookingsRide(
+                            expandedBookingsRide === ride.id ? null : ride.id,
+                          )
+                        }
+                        onJoinRide={() => joinRide(ride)}
+                        onGenerateOtp={() => generateRideOtp(ride)}
+                        onPayBooking={() => payForRide(ride)}
+                        onStartBooking={(bookingId, otp) =>
+                          startRideBooking(ride.id, bookingId, otp)
+                        }
+                        onAcceptBooking={(bookingId) =>
+                          acceptRideBooking(ride.id, bookingId)
+                        }
+                        onDeclineBooking={(bookingId) =>
+                          declineRideBooking(ride.id, bookingId)
+                        }
+                        onCompleteBooking={(bookingId) =>
+                          completeRideBooking(ride.id, bookingId)
+                        }
+                        captainBookings={captainRideBookings[ride.id]}
+                        isLoaded={isLoaded}
+                        buildRoute={buildRoute}
+                        getShortCity={getShortCity}
+                      />
+                    );
+                  })}
+                </div>
+              ) : mode === "find" && !ridesLoading && !ridesError ? (
                 <div className="text-center py-12">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Search size={32} className="text-gray-400" />
                   </div>
-                  <p className="text-gray-500">No rides found</p>
+                  <p className="text-gray-500">{emptyState.title}</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    Try searching for a different route
+                    {emptyState.subtitle}
                   </p>
                 </div>
               ) : null}
             </section>
 
-            {/* FLOATING ACTION BUTTON */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-40">
               <div className="max-w-md mx-auto px-5 py-4">
                 <button
@@ -797,11 +1152,9 @@ export default function GoRidesLanding() {
           </>
         )}
 
-        {/* PROFILE PANEL */}
         {showProfile && (
           <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm">
             <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl overflow-y-auto">
-              {/* Profile Header */}
               <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex justify-between items-center z-10">
                 <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
                 <button
@@ -812,9 +1165,7 @@ export default function GoRidesLanding() {
                 </button>
               </div>
 
-              {/* Profile Content */}
               <div className="p-5 space-y-6">
-                {/* User Avatar */}
                 <div className="flex flex-col items-center py-6">
                   <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
                     <User size={40} className="text-emerald-600" />
@@ -822,12 +1173,8 @@ export default function GoRidesLanding() {
                   <h3 className="text-xl font-bold text-gray-900">
                     {user.name}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Member since 2024
-                  </p>
                 </div>
 
-                {/* Personal Information */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
                     Personal Information
@@ -899,7 +1246,7 @@ export default function GoRidesLanding() {
                       className="w-full bg-emerald-500 text-white py-3 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
                       onClick={sendOtp}
                     >
-                      Verify Email
+                      {loading ? "sending otp..." : "Verify Email"}
                     </button>
                   )}
 
@@ -915,13 +1262,12 @@ export default function GoRidesLanding() {
                         className="w-full bg-emerald-500 text-white py-3 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
                         onClick={verifyOtp}
                       >
-                        Confirm OTP
+                        {loading ? "verifying otp..." : " Confirm OTP"}
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Captain Verification */}
                 <div className="border-t border-gray-100 pt-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <Shield className="text-emerald-600" size={20} />
@@ -994,7 +1340,6 @@ export default function GoRidesLanding() {
                   )}
                 </div>
 
-                {/* Logout */}
                 <div className="pt-6">
                   <button
                     onClick={getLogOut}
@@ -1012,802 +1357,3 @@ export default function GoRidesLanding() {
     </>
   );
 }
-
-function LazyRouteMap({ ride, isLoaded, buildRoute }) {
-  const [points, setPoints] = useState([]);
-  const mapRef = useRef(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadRoute = async () => {
-      const routePoints = await buildRoute(ride);
-      if (mounted) setPoints(routePoints);
-    };
-    loadRoute();
-    return () => (mounted = false);
-  }, [ride, buildRoute]);
-
-  const onLoad = (map) => {
-    mapRef.current = map;
-    if (points.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds();
-      points.forEach((p) => bounds.extend(p));
-      map.fitBounds(bounds);
-    }
-  };
-
-  if (!isLoaded) {
-    return (
-      <div className="h-[220px] flex items-center justify-center bg-gray-50 rounded-xl border border-gray-200">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-2">
-            <Navigation size={24} className="text-emerald-600 animate-pulse" />
-          </div>
-          <p className="text-sm text-gray-500">Loading map...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full h-[220px] rounded-xl overflow-hidden border border-gray-200">
-      <GoogleMap
-        onLoad={onLoad}
-        mapContainerStyle={{ width: "100%", height: "100%" }}
-        zoom={12}
-        center={points[0] || { lat: 17.385, lng: 78.4867 }}
-        options={{
-          zoomControl: false,
-          streetViewControl: false,
-          mapTypeControl: false,
-          fullscreenControl: false,
-        }}
-      >
-        {points.map((p, i) => (
-          <Marker
-            key={i}
-            position={p}
-            icon={
-              i === 0
-                ? {
-                    path: window.google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#10b981",
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2,
-                  }
-                : i === points.length - 1
-                  ? {
-                      path: window.google.maps.SymbolPath.CIRCLE,
-                      scale: 8,
-                      fillColor: "#ef4444",
-                      fillOpacity: 1,
-                      strokeColor: "#ffffff",
-                      strokeWeight: 2,
-                    }
-                  : undefined
-            }
-          />
-        ))}
-
-        {points.length > 1 && (
-          <Polyline
-            path={points}
-            options={{
-              strokeColor: "#10b981",
-              strokeOpacity: 1,
-              strokeWeight: 4,
-            }}
-          />
-        )}
-      </GoogleMap>
-    </div>
-  );
-}
-
-/*
-==============================
-OLD WRONG MAP CODE (COMMENTED)
-==============================
-
-This rendered maps in a SEPARATE SECTION:
-
-{mode === "find" && (
-  <div className="w-full max-w-md px-4 mt-2 space-y-3">
-    {filteredRides.map((ride) => (
-      <div key={ride.id}>
-        <GoogleMap />
-      </div>
-    ))}
-  </div>
-)}
-
-FIX:
-Maps now live INSIDE the ride card
-and only load when "View Route" is clicked.
-*/
-
-// import React, { useState, useEffect } from "react";
-// import { ToastContainer, toast } from "react-toastify";
-// import "react-toastify/dist/ReactToastify.css";
-// import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
-// import { LogOut } from "lucide-react";
-// import { Navigate, useNavigate } from "react-router-dom";
-// import { all } from "axios";
-
-// // ==============================
-// // // CONFIG
-// // ==============================
-// // // IMPORTANT:
-// // // If this is empty, maps will gracefully fallback to a placeholder UI
-// // to avoid Google Maps API errors in dev/sandbox environments.
-// const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx80"; // <-- Put your real key here in production
-
-// export default function GoRidesLanding() {
-//   const [screen, setScreen] = useState("home");
-//   const [mode, setMode] = useState("find");
-//   const [showProfile, setShowProfile] = useState(false);
-
-//   const [user, setUser] = useState({
-//     name: "Guest User",
-//     phone: "",
-//     emailid: "",
-//     emailVerifed: false,
-//     dlVerified: false,
-//     vehicle: { name: "", number: "" },
-//   });
-
-//   const [search, setSearch] = useState("");
-//   const [fromCity, setFromCity] = useState("");
-//   const [toCity, setToCity] = useState("");
-//   const [viaCities, setViaCities] = useState([]);
-//   const [newCity, setNewCity] = useState("");
-//   const [time, setTime] = useState("");
-//   const [seats, setSeats] = useState(1);
-//   const [date, setDate] = useState("");
-//   const [dlNumber, setDlNumber] = useState("");
-
-//   // OTP STATE
-//   const [otpSent, setOtpSent] = useState(false);
-//   const [otpInput, setOtpInput] = useState("");
-
-//   const captainStatus = user.dlVerified ? "approved" : "pending";
-
-//   // Only load Google Maps if key exists
-//   const shouldLoadMaps = Boolean(GOOGLE_MAPS_KEY);
-
-//   const { isLoaded } = useJsApiLoader(
-//     shouldLoadMaps
-//       ? { googleMapsApiKey: GOOGLE_MAPS_KEY }
-//       : { googleMapsApiKey: "" }
-//   );
-
-//   const [rides, setRides] = useState([
-//     {
-//       id: 1,
-//       route: ["Madhapur", "Gachibowli"],
-//       time: "9:30 AM",
-//       seats: 1,
-//       date: "2026-02-03",
-//       day: "Monday",
-//     },
-//   ]);
-
-//   const navigate = useNavigate();
-
-//   const getLogOut = () => {
-//     localStorage.clear(all);
-//     navigate("/login");
-//   };
-
-//   const submitCaptainVerification = () => {
-//     if (!user.phone || user.phone.trim().length < 10) {
-//       toast.error("Mobile number is required");
-//       return;
-//     }
-
-//     if (!dlNumber.trim()) {
-//       toast.error("Driving License number is required");
-//       return;
-//     }
-
-//     if (!user.vehicle.name.trim()) {
-//       toast.error("Vehicle name is required");
-//       return;
-//     }
-
-//     if (!user.vehicle.number.trim()) {
-//       toast.error("Vehicle number is required");
-//       return;
-//     }
-
-//     toast.success("Captain verification request sent to backend 🚀");
-
-//     // later you can call backend API here
-//   };
-
-//  // ==============================
-//   // REALTIME SEATS (MOCK WEBSOCKET)
-// ==============================
-//   useEffect(() => {
-//     const interval = setInterval(() => {
-//       setRides((prev) =>
-//         prev.map((r) => ({
-//           ...r,
-//           seats:
-//             r.seats > 0
-//               ? Math.max(0, r.seats - (Math.random() > 0.7 ? 1 : 0))
-//               : r.seats,
-//         }))
-//       );
-//     }, 5000);
-
-//     return () => clearInterval(interval);
-//   }, []);
-
-//   useEffect(() => {
-//     const storedUser = localStorage.getItem("user");
-//     if (storedUser) {
-//       const userData = JSON.parse(storedUser);
-//       setUser((prevUser) => ({
-//         ...prevUser,
-//         name: userData.name || prevUser.name,
-//         emailid: userData.email || prevUser.emailid,
-//       }));
-//     }
-//   }, []);
-
-//   const filteredRides = rides.filter((ride) =>
-//     ride.route.some((city) => city.toLowerCase().includes(search.toLowerCase()))
-//   );
-
-//   const addCity = () => {
-//     if (!newCity.trim()) return toast.error("Enter a city name before adding");
-//     setViaCities([...viaCities, newCity.trim()]);
-//     setNewCity("");
-//     toast.success("City added to route");
-//   };
-
-//   const getDayFromDate = (dateString) => {
-//     const options = { weekday: "long" };
-//     const d = new Date(dateString);
-//     return d.toLocaleDateString("en-US", options);
-//   };
-
-//   const publishRide = () => {
-//     if (captainStatus !== "approved")
-//       return toast.error("Captain must be approved before creating rides");
-
-//     if (!fromCity || !toCity)
-//       return toast.error("Please enter From and To cities");
-
-//     if (!date) return toast.error("Please select a date");
-
-//     const newRide = {
-//       id: Date.now(),
-//       route: [fromCity, ...viaCities, toCity],
-//       time: time || "Anytime",
-//       seats: Number(seats),
-//       date: date,
-//       day: getDayFromDate(date),
-//     };
-
-//     setRides([newRide, ...rides]);
-//     setFromCity("");
-//     setToCity("");
-//     setViaCities([]);
-//     setTime("");
-//     setSeats(1);
-//     setDate("");
-
-//     toast.success("Ride Published Successfully 🚀");
-//   };
-
-//   const sendOtp = async () => {
-//     if (!user.phone || user.phone.trim().length < 10) {
-//       toast.error("Please enter a valid mobile number first");
-//       return;
-//     }
-
-//     if (!user.emailid) {
-//       toast.error("Email not found");
-//       return;
-//     }
-
-//     try {
-//       const response = await fetch(
-//         `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
-//         {
-//           method: "POST",
-//           headers: { "Content-Type": "application/json" },
-//           body: JSON.stringify({ emailid: user.emailid }),
-//         }
-//       );
-
-//       const data = await response.json();
-
-//       if (response.ok) {
-//         setOtpSent(true);
-//         toast.success("OTP sent successfully");
-//       } else {
-//         toast.error(data.error || "Failed to send OTP");
-//       }
-//     } catch (error) {
-//       toast.error("Error sending OTP");
-//     }
-//   };
-
-//   // const sendOtp = async () => {
-//   //   if (!user.emailid) {
-//   //     toast.error("Enter email address first");
-//   //     return;
-//   //   }
-//   //   try {
-//   //     const response = await fetch(
-//   //       `${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`,
-//   //       {
-//   //         method: "POST",
-//   //         headers: { "Content-Type": "application/json" },
-//   //         body: JSON.stringify({ emailid: user.emailid }),
-//   //       },
-//   //     );
-//   //     const data = await response.json();
-//   //     if (response.ok) {
-//   //       setOtpSent(true);
-//   //       toast.success("OTP sent to your email");
-//   //     } else {
-//   //       toast.error(data.error || "Failed to send OTP");
-//   //     }
-//   //   } catch (error) {
-//   //     console.error(error, "error while sending otp");
-//   //     toast.error("Error sending OTP: " + error.message);
-//   //   }
-//   // };
-
-//   const verifyOtp = async () => {
-//     if (!otpInput) {
-//       toast.error("Enter OTP first");
-//       return;
-//     }
-//     try {
-//       const response = await fetch(
-//         `${import.meta.env.VITE_BACKEND_URL}/auth/api/verifyotp`,
-//         {
-//           method: "POST",
-//           headers: { "Content-Type": "application/json" },
-//           body: JSON.stringify({ emailid: user.emailid, otp: otpInput }),
-//         }
-//       );
-//       const data = await response.json();
-//       if (response.ok) {
-//         setUser({ ...user, emailVerifed: true });
-//         setOtpSent(false);
-//         setOtpInput("");
-//         toast.success("Email verified successfully");
-//       } else {
-//         toast.error(data.error || "Invalid or expired OTP");
-//       }
-//     } catch (error) {
-//       console.error(error, "error while verifying otp");
-//       toast.error("Error verifying OTP: " + error.message);
-//     }
-//   };
-
-//   const joinRide = (ride) => {
-//     if (!user.emailVerifed || !user.phone) {
-//       setShowProfile(true);
-//       return toast.error(
-//         "Please verify your mobile number before joining rides"
-//       );
-//     }
-
-//     toast.success(`Join request sent for ${ride.route.join(" → ")}`);
-//   };
-
-//   return (
-//     <>
-//       <ToastContainer position="top-center" />
-
-//       <div className="min-h-screen bg-white flex flex-col items-center justify-between relative">
-//         {/* TOP BAR */}
-//         <div className="w-full max-w-md px-4 py-3 flex justify-between items-center fixed top-0 bg-white z-10 border-b">
-//           <button
-//             onClick={() => {
-//               setScreen("home");
-//               setShowProfile(false);
-//             }}
-//             className="font-bold text-lg"
-//           >
-//             Go{""}
-//             <span className="text-red-500 font-extrabold">
-//               <span className="text-2xl inline-block align-baseline">R</span>
-//               ides
-//             </span>
-//           </button>
-
-//           <button
-//             onClick={() => setShowProfile(true)}
-//             className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center"
-//           >
-//             👤
-//           </button>
-//         </div>
-
-//         <div className="h-16" />
-
-//         {screen === "home" && (
-//           <>
-//             {/* MODE TOGGLE */}
-//             <div className="w-full max-w-md px-4 mt-4 flex bg-gray-100 rounded-full p-1">
-//               <button
-//                 onClick={() => setMode("find")}
-//                 className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-//                   mode === "find" ? "bg-white shadow" : "text-gray-500"
-//                 }`}
-//               >
-//                 Find Ride
-//               </button>
-
-//               <button
-//                 onClick={() => setMode("create")}
-//                 className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-//                   mode === "create" ? "bg-white shadow" : "text-gray-500"
-//                 }`}
-//               >
-//                 Captain Mode
-//               </button>
-//             </div>
-
-//             {/* SEARCH / CREATE */}
-//             <section className="w-full max-w-md px-4 mt-4">
-//               {mode === "find" ? (
-//                 <div className="relative">
-//                   <input
-//                     type="text"
-//                     placeholder="Search city on route"
-//                     value={search}
-//                     onChange={(e) => setSearch(e.target.value)}
-//                     className="w-full px-4 py-3 pl-10 rounded-full border"
-//                   />
-//                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-//                     🔍
-//                   </span>
-//                 </div>
-//               ) : (
-//                 <div className="space-y-2">
-//                   <p className="text-sm text-gray-500">
-//                     Captain status: {captainStatus}
-//                   </p>
-
-//                   <input
-//                     type="date"
-//                     value={date}
-//                     onChange={(e) => setDate(e.target.value)}
-//                     className="w-full px-4 py-2 rounded-full border"
-//                   />
-
-//                   <input
-//                     type="text"
-//                     placeholder="From"
-//                     value={fromCity}
-//                     onChange={(e) => setFromCity(e.target.value)}
-//                     className="w-full px-4 py-2 rounded-full border"
-//                   />
-
-//                   {viaCities.map((city, index) => (
-//                     <div
-//                       key={index}
-//                       className="w-full px-4 py-2 rounded-full border bg-gray-50 text-sm"
-//                     >
-//                       📍 {city}
-//                     </div>
-//                   ))}
-
-//                   <div className="flex gap-2">
-//                     <input
-//                       type="text"
-//                       placeholder="Add city in between"
-//                       value={newCity}
-//                       onChange={(e) => setNewCity(e.target.value)}
-//                       className="flex-1 px-4 py-2 rounded-full border"
-//                     />
-//                     <button
-//                       onClick={addCity}
-//                       className="bg-black text-white px-4 rounded-full"
-//                     >
-//                       + Add
-//                     </button>
-//                   </div>
-
-//                   <input
-//                     type="text"
-//                     placeholder="To"
-//                     value={toCity}
-//                     onChange={(e) => setToCity(e.target.value)}
-//                     className="w-full px-4 py-2 rounded-full border"
-//                   />
-
-//                   <input
-//                     type="time"
-//                     value={time}
-//                     onChange={(e) => setTime(e.target.value)}
-//                     className="w-full px-4 py-2 rounded-full border"
-//                   />
-
-//                   <input
-//                     type="number"
-//                     min={1}
-//                     placeholder="Seats"
-//                     value={seats}
-//                     onChange={(e) => setSeats(Number(e.target.value))}
-//                     className="w-full px-4 py-2 rounded-full border"
-//                   />
-//                 </div>
-//               )}
-//             </section>
-
-//             {/* RESULTS */}
-//             <section className="w-full max-w-md px-4 mt-4 flex-1">
-//               <div
-//                 className={`rounded-xl p-4 min-h-[200px] ${
-//                   search
-//                     ? "bg-black text-white"
-//                     : "bg-transparent text-gray-400"
-//                 }`}
-//               >
-//                 {mode === "find" &&
-//                   filteredRides.map((ride) => (
-//                     <div
-//                       key={ride.id}
-//                       className="flex justify-between items-center bg-white/10 rounded-lg px-4 py-3 mb-2"
-//                     >
-//                       <div>
-//                         <p className="font-semibold">
-//                           {ride.route.join(" → ")}
-//                         </p>
-//                         <p className="text-sm text-gray-300">
-//                           {ride.day} • {ride.date} • {ride.time} • Seats:{" "}
-//                           {ride.seats}
-//                         </p>
-//                       </div>
-//                       <button
-//                         onClick={() => joinRide(ride)}
-//                         className="bg-red-500 text-white px-3 py-1 rounded-full"
-//                       >
-//                         Join
-//                       </button>
-//                     </div>
-//                   ))}
-
-//                 {mode === "create" && (
-//                   <p className="text-center text-gray-500">
-//                     Select date, route, and time — then publish when approved
-//                   </p>
-//                 )}
-//               </div>
-//             </section>
-
-//             {/* MAP PREVIEW PER RIDE */}
-
-//             {mode === "find" && (
-//               <div className="w-full max-w-md px-4 mt-2 space-y-3">
-//                 {filteredRides.map((ride) => (
-//                   <div key={ride.id} className="rounded-xl overflow-hidden">
-//                     {shouldLoadMaps && isLoaded ? (
-//                       <GoogleMap
-//                         zoom={12}
-//                         center={{ lat: 17.385, lng: 78.4867 }}
-//                         mapContainerStyle={{
-//                           width: "100%",
-//                           height: "150px",
-//                         }}
-//                       >
-//                         <Marker position={{ lat: 17.385, lng: 78.4867 }} />
-//                       </GoogleMap>
-//                     ) : (
-//                       <div className="w-full h-[150px] flex items-center justify-center bg-gray-100 text-gray-500 text-sm rounded-xl">
-//                         📍 Map preview disabled (Add Google Maps API key)
-//                       </div>
-//                     )}
-//                   </div>
-//                 ))}
-//               </div>
-//             )}
-
-//             {/* PUBLISH BUTTON */}
-//             <div className="fixed bottom-4 w-full max-w-md px-4">
-//               <button
-//                 className="w-full bg-gradient-to-r from-red-300 to-green-300 text-red-600 font-semibold py-4 rounded-full"
-//                 onClick={() =>
-//                   mode === "create" ? publishRide() : setMode("create")
-//                 }
-//               >
-//                 {mode === "create" ? "Publish Ride →" : "Create Ride →"}
-//               </button>
-//             </div>
-//           </>
-//         )}
-
-//         {/* PROFILE PANEL */}
-//         {showProfile && (
-//           <div className="fixed inset-0 bg-black/40 z-20 flex justify-end">
-//             <div className="w-full max-w-md bg-white h-full p-4 space-y-4">
-//               <div className="flex justify-between items-center">
-//                 <h2 className="text-lg font-bold">My Profile</h2>
-//                 <button
-//                   className="text-gray-500"
-//                   onClick={() => setShowProfile(false)}
-//                 >
-//                   ✕
-//                 </button>
-//               </div>
-
-//               <div className="space-y-2">
-//                 <label className="text-sm">Name</label>
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   value={user.name}
-//                   readOnly
-//                   onChange={(e) => setUser({ ...user, name: e.target.value })}
-//                 />
-
-//                 <label className="text-sm">Mobile Number</label>
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   placeholder="Enter mobile number"
-//                   value={user.phone}
-//                   required
-//                   onChange={(e) => setUser({ ...user, phone: e.target.value })}
-//                 />
-//                 <label className="text-sm">Email Id</label>
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   placeholder="Enter Email Id"
-//                   value={user.emailid}
-//                   readOnly
-//                   onChange={(e) =>
-//                     setUser({ ...user, emailid: e.target.value })
-//                   }
-//                 />
-
-//                 {!user.emailVerifed && !otpSent && (
-//                   <button
-//                     className="w-full bg-black text-white py-2 rounded-full"
-//                     onClick={sendOtp}
-//                   >
-//                     Send OTP
-//                   </button>
-//                 )}
-
-//                 {!user.emailVerifed && otpSent && (
-//                   <div className="space-y-2">
-//                     <input
-//                       className="w-full px-4 py-2 rounded-full border"
-//                       placeholder="Enter Email OTP"
-//                       value={otpInput}
-//                       onChange={(e) => setOtpInput(e.target.value)}
-//                     />
-//                     <button
-//                       className="w-full bg-green-500 text-white py-2 rounded-full"
-//                       onClick={verifyOtp}
-//                     >
-//                       Verify OTP
-//                     </button>
-//                   </div>
-//                 )}
-
-//                 {user.emailVerifed && (
-//                   <p className="text-green-600 text-sm">Email Verified ✔</p>
-//                 )}
-//               </div>
-
-//               <div className="border-t pt-4 space-y-2">
-//                 <h3 className="font-semibold">
-//                   Captain Verification (Optional)
-//                 </h3>
-
-//                 <p className="text-sm text-gray-500">
-//                   Required only to create rides. Verified manually by backend
-//                   team.
-//                 </p>
-
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   placeholder="Driving License Number"
-//                   value={dlNumber}
-//                   onChange={(e) => setDlNumber(e.target.value)}
-//                 />
-
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   placeholder="Vehicle Name"
-//                   value={user.vehicle.name}
-//                   onChange={(e) =>
-//                     setUser({
-//                       ...user,
-//                       vehicle: {
-//                         ...user.vehicle,
-//                         name: e.target.value,
-//                       },
-//                     })
-//                   }
-//                 />
-
-//                 <input
-//                   className="w-full px-4 py-2 rounded-full border"
-//                   placeholder="Vehicle Number"
-//                   value={user.vehicle.number}
-//                   onChange={(e) =>
-//                     setUser({
-//                       ...user,
-//                       vehicle: {
-//                         ...user.vehicle,
-//                         number: e.target.value,
-//                       },
-//                     })
-//                   }
-//                 />
-
-//                 <button
-//                   className="w-full bg-blue-500 text-white py-2 rounded-full"
-//                   onClick={submitCaptainVerification}
-//                 >
-//                   Submit for Captain Approval
-//                 </button>
-
-//                 <p className="text-sm text-gray-500">Status: {captainStatus}</p>
-
-//                 <div className="mt-10 flex justify-center">
-//                   <p>
-//                     <button
-//                       onClick={getLogOut}
-//                       className="flex items-center gap-2 px-5 py-2 rounded-xl bg-red-500 text-white font-semibold
-//                         hover:bg-red-600 transition-all shadow-md"
-//                     >
-//                       Logout <LogOut size={18} />
-//                     </button>
-//                   </p>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </>
-//   );
-// }
-
-// // ==============================
-// // // BASIC TEST CASES (JEST)
-// // ==============================
-// // /*
-// // import { render, fireEvent } from "@testing-library/react";
-// // import GoRidesLanding from "./GoRidesLanding";
-
-// // test("opens profile panel when profile button is clicked", () => {
-// //   const { getByText } = render(<GoRidesLanding />);
-// //   fireEvent.click(getByText("👤"));
-// //   expect(getByText("My Profile")).toBeInTheDocument();
-// // });
-
-// // test("prevents publishing ride when not approved", () => {
-// //   const { getByText } = render(<GoRidesLanding />);
-// //   fireEvent.click(getByText("Captain Mode"));
-// //   fireEvent.click(getByText("Publish Ride →"));
-// //   expect(
-// //     getByText("Captain must be approved before creating rides")
-// //   ).toBeInTheDocument();
-// // });
-
-// // // NEW TEST
-// // // verifies day auto-calculates from date
-// // test("calculates day of week from selected date", () => {
-// //   const { getByText, getByLabelText } = render(<GoRidesLanding />);
-// //   fireEvent.click(getByText("Captain Mode"));
-// //   const dateInput = document.querySelector('input[type="date"]');
-// //   fireEvent.change(dateInput, { target: { value: "2026-02-03" } });
-// //   fireEvent.click(getByText("Create Ride →"));
-// //   expect(document.body.textContent).toMatch(/Tuesday|Monday|Wednesday/);
-// // });
-// // */
