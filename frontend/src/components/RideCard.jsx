@@ -31,7 +31,6 @@ export default function RideCard({
   const canPay =
     bookingStatus === "completed" && ride.paymentStatus === "pending";
   const showLiveLocation = bookingStatus === "confirmed";
-  console.log(ride, "iam ride");
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       {ride.bookingStatus && (
@@ -128,7 +127,7 @@ export default function RideCard({
           <div className="text-right">
             <p className="text-sm text-gray-500">{ride.vehicle} Bike</p>
             <p className="text-sm text-black font-bold ">
-              {ride.vehicleNumber.split("").join(" ")}
+              {ride?.vehicleNumber?.split("").join(" ")}
             </p>
           </div>
         </div>
@@ -168,7 +167,9 @@ export default function RideCard({
               )}
               {bookingStatus === "confirmed" && (
                 <div className="flex-1 bg-emerald-50 text-emerald-700 py-2.5 rounded-xl font-semibold text-center">
-                  {ride.bookingOtp.split("").join(" ")}
+                  {ride.bookingOtp
+                    ? ride.bookingOtp.split("").join(" ")
+                    : "OTP pending"}
                 </div>
               )}
               {canPay && (

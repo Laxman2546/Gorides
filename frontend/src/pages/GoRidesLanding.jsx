@@ -18,6 +18,7 @@ import {
   Twitter,
   Linkedin,
 } from "lucide-react";
+import axios from "axios";
 
 export default function GoRidesLanding() {
   const navigate = useNavigate();
@@ -63,7 +64,19 @@ export default function GoRidesLanding() {
     { number: "4.8★", label: "Average Rating" },
     { number: "25+", label: "Cities" },
   ];
-
+  const serverWakeup = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/wakeup`,
+      );
+      console.log(response);
+    } catch (e) {
+      console.log("failed to wakeup the server", e);
+    }
+  };
+  useEffect(() => {
+    serverWakeup();
+  }, []);
   return (
     <div className="w-full min-h-screen bg-white text-gray-900 overflow-x-hidden">
       <motion.header

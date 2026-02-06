@@ -8,6 +8,7 @@ import captainRoute from "./src/routes/captainRoute.js";
 import ridesRoute from "./src/routes/Rides.Route.js";
 import { connectDb } from "./src/config/db.js";
 import cookieParser from "cookie-parser";
+
 import cors from "cors";
 const app = express();
 const server = http.createServer(app);
@@ -46,6 +47,9 @@ app.use("/maps", mapsRoute);
 app.use("/admin", adminRoute);
 app.use("/captain", captainRoute);
 app.use("/rides", ridesRoute);
+app.get("/wakeup", (req, res) => {
+  res.send("server is wakeup");
+});
 const port = process.env.PORT || 3001;
 server.listen(port, () => {
   console.log(`server is running ${port}`);
