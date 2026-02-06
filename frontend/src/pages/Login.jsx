@@ -8,6 +8,7 @@ const Login = () => {
   const [formData, setFormData] = useState({
     emailid: "",
     password: "",
+
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,10 +24,11 @@ const Login = () => {
   };
 
   const handleForgetPassword = () => {
-    toast.error("Forget password currently not working.", {
-      position: "top-center",
-      autoClose: 2500,
-    });
+    // toast.error("Forget password currently not working.", {
+    //   position: "top-center",
+    //   autoClose: 2500,
+    // });
+    navigate("/forgot-password")
   };
 
   const handleLogin = async (e) => {
@@ -80,6 +82,8 @@ const Login = () => {
     navigate("/");
   };
 
+
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <ToastContainer />

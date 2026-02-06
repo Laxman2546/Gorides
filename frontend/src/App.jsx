@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import GoRidesLanding from "./pages/GoRidesLanding";
 import Dashboard from "./pages/Dashboard";
+import ForgotPassword from "./pages/ForgotPassword";
+
 
 // Admin
 import AdminLogin from "./admin/AdminLogin";
@@ -38,6 +40,8 @@ const App = () => {
       <Route path="/" element={<GoRidesLanding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+
 
       {/* User Protected (PATH UNCHANGED) */}
       <Route
