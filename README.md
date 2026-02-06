@@ -147,7 +147,7 @@ Current challenges in urban commuting:
    Create `.env` file in the backend directory:
 
    ```env
-   PORT=5000
+   PORT=3000
    MONGODB_URI=your_mongodb_connection_string
    JWT_SECRET=your_jwt_secret
    GOOGLE_MAPS_API_KEY=your_google_maps_api_key
@@ -158,7 +158,7 @@ Current challenges in urban commuting:
    Create `.env` file in the frontend directory:
 
    ```env
-   VITE_API_URL=http://localhost:5000
+   VITE_API_URL=http://localhost:3000
    VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
    ```
 
@@ -176,7 +176,7 @@ Current challenges in urban commuting:
 
 5. **Access the application**
    - Frontend: `http://localhost:5173`
-   - Backend API: `http://localhost:5000`
+   - Backend API: `http://localhost:3000`
 
 ## 👥 User Flows
 
@@ -276,7 +276,6 @@ We welcome contributions! Please follow these steps:
         <sub><b>Kurumurthy M</b></sub>
       </a>
     </td>
-    <!-- To add another contributor, copy from <td to </td> and paste it below this line -->
   </tr>
 </table>
 
@@ -284,10 +283,11 @@ We welcome contributions! Please follow these steps:
       
 
 
-## 📞 Contact
+## 📞 Links
 
-Project Link:https://github.com/laxman2546/gorides
-Live Link: https://gorides.vercel.app/
+<a href="https://github.com/laxman2546/gorides">Github Link</a>
+<br/>
+<a href="https://gorides.vercel.app/">Live Demo</a>
 ---
 
 **Made with ❤️ for sustainable urban mobility**
