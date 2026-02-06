@@ -257,34 +257,37 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👏 Acknowledgments
 
 - Google Maps API for location services
 - Razorpay for secure payment processing
 - All contributors who help make commuting better
-👨‍💻 Contributors
+
+  
+## 👨‍💻 Contributors
+
 <table>
   <tr>
     <td align="center">
       <a href="https://github.com/marennagarikurumurthy2005">
-        <img src="https://avatars.githubusercontent.com/u/151370122?v=4" width="100px;" alt="Kurumurthy M"/>
+        <img src="https://avatars.githubusercontent.com/u/151370122?v=4" width="50px" alt="Kurumurthy M"/>
         <br />
         <sub><b>Kurumurthy M</b></sub>
       </a>
-      <br />
-      <sub>Frontend Developer</sub>
     </td>
+    <!-- To add another contributor, copy from <td to </td> and paste it below this line -->
   </tr>
 </table>
 
+
+      
+
+
 ## 📞 Contact
 
-Project Link: [https://github.com/laxman2546/gorides](https://github.com/yourusername/gorides)
-
+Project Link:https://github.com/laxman2546/gorides
+Live Link: https://gorides.vercel.app/
 ---
 
 **Made with ❤️ for sustainable urban mobility**
