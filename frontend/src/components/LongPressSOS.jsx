@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 
-
 export default function LongPressSOS() {
   const timerRef = useRef(null);
   const [holding, setHolding] = useState(false);
@@ -48,26 +47,24 @@ export default function LongPressSOS() {
 
       alert(`🚨 SOS Activated!\nLat: ${latitude}\nLng: ${longitude}`);
 
-      // Emergency Call
       window.location.href = "tel:112";
     });
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div>
       <button
         onMouseDown={startPress}
         onMouseUp={endPress}
         onMouseLeave={endPress}
         onTouchStart={startPress}
         onTouchEnd={endPress}
-        className="relative w-20 h-20 rounded-full bg-red-600 text-white font-bold shadow-xl active:scale-95 select-none"
+        className="relative w-10 h-10 rounded-full bg-red-600 text-white font-bold shadow-xl active:scale-95 select-none"
       >
         SOS
-
         {holding && (
           <span
-            className="absolute inset-0 rounded-full border-4 border-white"
+            className="absolute  inset-0 rounded-full border-4 border-white"
             style={{
               clipPath: `inset(${100 - progress}% 0 0 0)`,
             }}

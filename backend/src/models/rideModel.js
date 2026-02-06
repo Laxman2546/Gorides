@@ -49,6 +49,19 @@ const rideSchema = new mongoose.Schema({
         default: 1,
         min: 1,
       },
+      dropLocation: {
+        type: String,
+        trim: true,
+      },
+      dropDistance: {
+        type: Number,
+      },
+      dropDuration: {
+        type: Number,
+      },
+      unitPrice: {
+        type: Number,
+      },
       status: {
         type: String,
         enum: ["pending", "confirmed", "ongoing", "completed", "cancelled", "declined"],

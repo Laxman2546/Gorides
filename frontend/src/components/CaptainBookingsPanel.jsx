@@ -7,6 +7,7 @@ export default function CaptainBookingsPanel({
   onDecline,
   onStart,
   onComplete,
+  defaultDropLabel,
 }) {
   const [otpInputs, setOtpInputs] = useState({});
 
@@ -24,6 +25,12 @@ export default function CaptainBookingsPanel({
         const bookingId = booking._id || booking.id;
         const riderName =
           booking.userId?.username || booking.user?.username || "Rider";
+        const resolvedDrop =
+          booking.dropLocation || defaultDropLabel || "Not provided";
+        const hasUnitPrice = Number.isFinite(Number(booking.unitPrice));
+        const priceLabel = hasUnitPrice
+          ? `₹${Number(booking.unitPrice).toFixed(0)}`
+          : "₹--";
         return (
           <div
             key={bookingId}
@@ -49,6 +56,16 @@ export default function CaptainBookingsPanel({
             </div>
             <p className="text-sm font-semibold mb-2 text-gray-900">
               Rider Number: {booking.userId?.phone || "N/A"}
+            </p>
+            <p className="text-xs text-gray-600 mb-2">
+              Passenger Drop:{" "}
+              <span className="font-medium text-gray-900">
+                {resolvedDrop}
+              </span>
+            </p>
+            <p className="text-xs text-gray-600 mb-2">
+              Drop Fare (per seat):{" "}
+              <span className="font-medium text-gray-900">{priceLabel}</span>
             </p>
 
             {booking.status === "pending" && (

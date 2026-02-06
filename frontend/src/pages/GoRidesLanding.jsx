@@ -91,10 +91,10 @@ export default function GoRidesLanding() {
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <button onClick={NavtoHome} className="flex items-center gap-2 group">
-            <div className="w-11 h-11 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:bg-emerald-600 transition-all">
+            <div className="w-9 md:w-11 h-9 md:h-11 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:bg-emerald-600 transition-all">
               <Car className="text-white" size={24} />
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold">
+            <h1 className="text-xl md:text-3xl font-bold">
               <span
                 className={
                   scrolled ? "text-gray-900" : "text-white drop-shadow-lg"
@@ -139,10 +139,10 @@ export default function GoRidesLanding() {
             </a>
           </nav>
 
-          <div className="flex gap-3">
+          <div className="ml-2 flex gap-3">
             <button
               onClick={NavtoLogin}
-              className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
+              className={`px-2 text-sm md:text-md md:px-5 py-2.5 rounded-xl font-semibold transition-all text-nowrap  ${
                 scrolled
                   ? "border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
                   : "border-2 border-white/80 text-white drop-shadow-lg hover:bg-white/20 backdrop-blur-sm"
@@ -152,7 +152,7 @@ export default function GoRidesLanding() {
             </button>
             <button
               onClick={NavtoReg}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-colors shadow-lg hover:shadow-xl"
+              className="px-2 md:px-5 py-2.5 text-nowrap text-sm md:text-md rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-colors shadow-lg hover:shadow-xl"
             >
               Sign Up
             </button>
@@ -289,7 +289,7 @@ export default function GoRidesLanding() {
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-12 relative">
-            <div className="hidden md:block absolute top-20 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500"></div>
+            <div className="hidden  absolute top-20 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500"></div>
 
             {[
               {
@@ -384,7 +384,7 @@ export default function GoRidesLanding() {
         </motion.div>
       </section>
 
-      <section id="contact" className="py-24 px-6 bg-white">
+      {/* <section id="contact" className="py-24 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -501,7 +501,7 @@ export default function GoRidesLanding() {
             </motion.div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       <footer className="bg-gray-900 text-gray-300 py-12">
         <div className="max-w-7xl mx-auto px-6">

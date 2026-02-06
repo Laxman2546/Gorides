@@ -153,6 +153,12 @@ export default function GoRidesLanding() {
     const availableSeats = Math.max(0, seatsTotal - bookedSeats);
     const booking = ride.booking || null;
     const bookingSeats = booking?.seats || 0;
+    const bookingDropLocation =
+      booking?.dropLocation || (isBooking ? ride.destination : undefined);
+    const unitPrice =
+      isBooking && Number.isFinite(Number(booking?.unitPrice))
+        ? Number(booking.unitPrice)
+        : Number(ride.price || 0);
     const captainUserId =
       ride.captainId?.userId?._id ||
       ride.captainId?.userId ||
@@ -165,9 +171,14 @@ export default function GoRidesLanding() {
       ride.riderLocation ||
       ride.booking?.userId?.location ||
       ride.userId?.location;
+    const routePoints = [ride.pickuppoint];
+    if (isBooking && bookingDropLocation) {
+      routePoints.push(bookingDropLocation);
+    }
+    routePoints.push(ride.destination);
     return {
       id: ride._id || ride.id,
-      route: [ride.pickuppoint, ride.destination].filter(Boolean),
+      route: routePoints.filter(Boolean),
       time: ride.time,
       date: ride.date,
       day: getDayFromDate(ride.date),
@@ -175,9 +186,10 @@ export default function GoRidesLanding() {
       bookedSeats: bookingSeats || bookedSeats,
       driver: ride.captainId?.userId?.username || "Captain",
       vehicle: ride.captainId?.vehicleName || "Bike",
-      price: formatPrice(ride.price),
+      price: formatPrice(unitPrice),
       pickupPoint: ride.pickuppoint,
       dropPoint: ride.destination,
+      bookingDropLocation,
       captainUserId,
       captainLocation,
       riderLocation,
@@ -191,9 +203,9 @@ export default function GoRidesLanding() {
       paymentStatus:
         booking?.paymentStatus || (isBooking ? "pending" : undefined),
       totalAmount: booking
-        ? formatPrice(Number(ride.price || 0) * bookingSeats)
+        ? formatPrice(unitPrice * bookingSeats)
         : isBooking
-          ? formatPrice(ride.price)
+          ? formatPrice(unitPrice)
           : undefined,
     };
   };
@@ -469,7 +481,7 @@ export default function GoRidesLanding() {
     }
   };
 
-  const joinRide = async (ride) => {
+  const joinRide = async (ride, dropLocation) => {
     if (!user.emailVerifed || !user.phone) {
       setShowProfile(true);
       return toast.error("Please verify profile before joining rides");
@@ -477,12 +489,10 @@ export default function GoRidesLanding() {
     try {
       await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/rides/book/${ride.id}`,
-        { seats: 1 },
+        { seats: 1, dropLocation },
         { withCredentials: true },
       );
-      toast.success(
-        `Ride booked for ${ride.route.map(getShortCity).join(" -> ")}`,
-      );
+      toast.success(`Ride request sent waiting for captain Acceptance`);
       refreshRides();
     } catch (e) {
       console.error("Error booking ride:", e);
@@ -1023,7 +1033,7 @@ export default function GoRidesLanding() {
                     }`}
                   >
                     <div className="flex items-center justify-center gap-2">
-                      My Rides
+                      Booked Rides
                       {myBookedRides.filter(
                         (r) => r.bookingStatus === "confirmed",
                       ).length > 0 && (
@@ -1094,7 +1104,9 @@ export default function GoRidesLanding() {
                             expandedBookingsRide === ride.id ? null : ride.id,
                           )
                         }
-                        onJoinRide={() => joinRide(ride)}
+                        onJoinRide={(dropLocation) =>
+                          joinRide(ride, dropLocation)
+                        }
                         onGenerateOtp={() => generateRideOtp(ride)}
                         onPayBooking={() => payForRide(ride)}
                         onStartBooking={(bookingId, otp) =>

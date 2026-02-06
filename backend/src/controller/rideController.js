@@ -29,21 +29,20 @@ const parseDurationMinutes = (durationText) => {
 };
 
 const calculatePrice = (distanceKm, durationMin) => {
-  const baseFare = 12;
+  const baseFare = 10;
   const perKmRate =
     distanceKm <= 3
       ? 5
       : distanceKm <= 10
-        ?3.0
+        ? 4
         : distanceKm <= 25
-          ? 2.9
-          : 2.8;
+          ? 3.5
+          : 3.2;
   const distanceCost = distanceKm * perKmRate;
-  const timeCost = (durationMin / 60) * 0.2;
+  const timeCost = (durationMin / 60) * 0.6;
   const rawPrice = distanceCost + timeCost + baseFare;
-  const competitiveDiscount = Number(process.env.COMP_PRICE_FACTOR || 0.85);
-  const minFare = 10;
-  const price = Math.max(rawPrice * competitiveDiscount, minFare);
+  const minFare = 12;
+  const price = Math.max(rawPrice, minFare);
   return { price, baseFare };
 };
 
@@ -145,7 +144,7 @@ export const listRides = async (req, res) => {
 
 export const bookRide = async (req, res) => {
   const { id } = req.params;
-  const { seats = 1 } = req.body;
+  const { seats = 1, dropLocation } = req.body;
   const userId = req.user?.id;
   try {
     const ride = await ridesModel.findById(id);
@@ -165,11 +164,43 @@ export const bookRide = async (req, res) => {
       return res.status(400).json({ error: "not enough seats" });
     }
 
+    const bookingData = {
+      userId,
+      seats: seatCount,
+      status: "pending",
+      paymentStatus: "pending",
+    };
+
+    const cleanedDropLocation =
+      typeof dropLocation === "string" ? dropLocation.trim() : "";
+    if (cleanedDropLocation) {
+      bookingData.dropLocation = cleanedDropLocation;
+    } else if (ride.destination) {
+      bookingData.dropLocation = ride.destination;
+    }
+    if (
+      cleanedDropLocation &&
+      cleanedDropLocation.toLowerCase() !==
+        String(ride.destination || "").trim().toLowerCase()
+    ) {
+      const dropDistanceData = await getDistanceTime(
+        ride.pickuppoint,
+        cleanedDropLocation,
+      );
+      if (dropDistanceData?.error) {
+        return res.status(400).json({ error: "drop location not found" });
+      }
+      const dropDistanceKm = parseDistanceKm(dropDistanceData.distance);
+      const dropDurationMin = parseDurationMinutes(dropDistanceData.duration);
+      const { price } = calculatePrice(dropDistanceKm, dropDurationMin);
+      bookingData.dropLocation = cleanedDropLocation;
+      bookingData.dropDistance = dropDistanceKm;
+      bookingData.dropDuration = dropDurationMin;
+      bookingData.unitPrice = price;
+    }
+
     ride.passengers = [...(ride.passengers || []), userId];
-    ride.bookings = [
-      ...(ride.bookings || []),
-      { userId, seats: seatCount, status: "pending", paymentStatus: "pending" },
-    ];
+    ride.bookings = [...(ride.bookings || []), bookingData];
     await ride.save();
     return res.status(200).json(ride);
   } catch (e) {
@@ -218,7 +249,16 @@ export const listCaptainBookings = async (req, res) => {
       .populate("bookings.userId")
       .sort({ createdAt: -1 })
       .lean();
-    return res.status(200).json(rides);
+    const data = rides.map((ride) => {
+      const destination =
+        typeof ride.destination === "string" ? ride.destination.trim() : "";
+      const bookings = (ride.bookings || []).map((booking) => {
+        if (booking?.dropLocation || !destination) return booking;
+        return { ...booking, dropLocation: destination };
+      });
+      return { ...ride, bookings };
+    });
+    return res.status(200).json(data);
   } catch (e) {
     console.log(e, "error while listing captain bookings");
     return res
@@ -418,6 +458,45 @@ export const completeBooking = async (req, res) => {
     booking.status = "completed";
     booking.paymentStatus = "pending";
     await ride.save();
+    if (
+      ride.seats === 1 &&
+      booking.dropLocation &&
+      String(booking.dropLocation).trim().toLowerCase() !==
+        String(ride.destination || "").trim().toLowerCase()
+    ) {
+      const remainderDistanceData = await getDistanceTime(
+        booking.dropLocation,
+        ride.destination,
+      );
+      if (!remainderDistanceData?.error) {
+        const remainderDistanceKm = parseDistanceKm(
+          remainderDistanceData.distance,
+        );
+        const remainderDurationMin = parseDurationMinutes(
+          remainderDistanceData.duration,
+        );
+        const { price: remainderPrice, baseFare: remainderFare } =
+          calculatePrice(remainderDistanceKm, remainderDurationMin);
+        const now = new Date();
+        const remainderMinutes = Math.max(1, Math.round(remainderDurationMin));
+        const startAt = new Date(now.getTime() + remainderMinutes * 60 * 1000);
+        const remainderDate = startAt.toISOString().slice(0, 10);
+        const remainderTime = startAt.toTimeString().slice(0, 5);
+        await ridesModel.create({
+          captainId: ride.captainId,
+          pickuppoint: booking.dropLocation,
+          destination: ride.destination,
+          time: remainderTime,
+          date: remainderDate,
+          seats: 1,
+          bookedSeats: 0,
+          price: remainderPrice,
+          distance: remainderDistanceKm,
+          duration: remainderDurationMin,
+          fare: remainderFare,
+        });
+      }
+    }
     return res.status(200).json({ message: "ride completed", booking });
   } catch (e) {
     console.log(e, "error while completing ride");
@@ -478,7 +557,7 @@ export const payForBooking = async (req, res) => {
     }
 
     const seatCount = Number(booking.seats || 1);
-    const basePrice = Number(ride.price || 0);
+    const basePrice = Number(booking.unitPrice || ride.price || 0);
     const amount = Math.round(basePrice * seatCount * 100);
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: "invalid amount" });

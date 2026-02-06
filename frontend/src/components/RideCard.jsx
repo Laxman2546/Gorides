@@ -1,9 +1,10 @@
-import React from "react";
-import { Calendar, Clock, Users, User, X } from "lucide-react";
-import RideRouteMap from "./RideRouteMap.jsx";
-import RideLiveLocationMap from "./RideLiveLocationMap.jsx";
+import { useEffect, useRef, useState } from "react";
+import { Calendar, Clock, User, Users, X } from "lucide-react";
+import axios from "axios";
 import CaptainBookingsPanel from "./CaptainBookingsPanel.jsx";
-
+import RideLiveLocationMap from "./RideLiveLocationMap.jsx";
+import RideRouteMap from "./RideRouteMap.jsx";
+import LongPressSOS from "../components/LongPressSOS.jsx";
 export default function RideCard({
   ride,
   isCaptainOwner,
@@ -25,12 +26,46 @@ export default function RideCard({
   userLocation,
   locationError,
 }) {
+  const [dropLocation, setDropLocation] = useState("");
+  const [dropSuggestions, setDropSuggestions] = useState([]);
+  const dropDebounceRef = useRef(null);
   const showPaymentDetails = Boolean(ride.paymentStatus);
   const bookingStatus = ride.bookingStatus;
   const isPending = bookingStatus === "pending";
   const canPay =
     bookingStatus === "completed" && ride.paymentStatus === "pending";
   const showLiveLocation = bookingStatus === "confirmed";
+
+  useEffect(() => {
+    if (!dropLocation || dropLocation.trim().length < 2) {
+      setDropSuggestions([]);
+      return;
+    }
+
+    if (dropDebounceRef.current) {
+      clearTimeout(dropDebounceRef.current);
+    }
+
+    dropDebounceRef.current = setTimeout(async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/maps/getsuggestions?query=${encodeURIComponent(
+            dropLocation.trim(),
+          )}`,
+          { withCredentials: true },
+        );
+        setDropSuggestions(Array.isArray(response.data) ? response.data : []);
+      } catch (e) {
+        setDropSuggestions([]);
+      }
+    }, 300);
+
+    return () => {
+      if (dropDebounceRef.current) {
+        clearTimeout(dropDebounceRef.current);
+      }
+    };
+  }, [dropLocation]);
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       {ride.bookingStatus && (
@@ -126,20 +161,30 @@ export default function RideCard({
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">{ride.vehicle} Bike</p>
-            <p className="text-sm text-black font-bold ">
-              {ride?.vehicleNumber?.split("").join(" ")}
-            </p>
+            {bookingStatus == "confirmed" && (
+              <p className="text-sm text-black font-bold ">
+                {ride?.vehicleNumber?.split("").join(" ")}
+              </p>
+            )}
           </div>
         </div>
+        {ride.bookingDropLocation && (
+          <div className="mb-3 text-sm text-gray-600">
+            Passenger Drop:{" "}
+            <span className="font-medium text-gray-900">
+              {ride.bookingDropLocation}
+            </span>
+          </div>
+        )}
         {ride.bookingStatus == "confirmed" && (
           <div>
-            <p className="font-medium text-gray-600 pl-3 pb-3">
+            <p className="font-medium text-gray-600  pb-3">
               Captain Number: {ride.phone || "N/A"}
             </p>
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 relative">
           {isCaptainOwner ? (
             <>
               <button
@@ -149,7 +194,7 @@ export default function RideCard({
                 {bookingsExpanded ? "Hide Bookings" : "View Bookings"}
               </button>
               <button
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="  px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                 onClick={onToggleExpand}
               >
                 {expanded ? "Hide" : "View Route"}
@@ -189,20 +234,57 @@ export default function RideCard({
             </>
           ) : (
             <>
-              <button
-                onClick={onJoinRide}
-                className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
-              >
-                Join Ride
-              </button>
-              <button
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                onClick={onToggleExpand}
-              >
-                {expanded ? "Hide" : "View Route"}
-              </button>
+              <div className="flex-1 flex flex-col gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Drop location (optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                      placeholder={`e.g. ${getShortCity(ride.dropPoint) || "City"}`}
+                      value={dropLocation}
+                      onChange={(e) => setDropLocation(e.target.value)}
+                    />
+                    {dropSuggestions.length > 0 && (
+                      <ul className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-auto">
+                        {dropSuggestions.map((suggestion) => (
+                          <li
+                            key={suggestion.place_id}
+                            className="px-4 py-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50"
+                            onClick={() => {
+                              setDropLocation(suggestion.description);
+                              setDropSuggestions([]);
+                            }}
+                          >
+                            {suggestion.description}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onJoinRide?.(dropLocation)}
+                  className="w-full bg-emerald-500 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-600 transition-colors"
+                >
+                  Join Ride
+                </button>
+                <button
+                  className="max-h-fit  px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  onClick={onToggleExpand}
+                >
+                  {expanded ? "Hide" : "View Route"}
+                </button>
+              </div>
             </>
           )}
+          {bookingStatus == "confirmed" ||
+            (bookingStatus == "ongoing" && (
+              <div className="absolute right-0">
+                <LongPressSOS />
+              </div>
+            ))}
         </div>
       </div>
 
@@ -267,12 +349,28 @@ export default function RideCard({
                           {idx === 0 && (
                             <p className="text-xs text-gray-500">Pickup</p>
                           )}
+                          {idx > 0 && idx < ride.route.length - 1 && (
+                            <p className="text-xs text-gray-500">
+                              Passenger Drop
+                            </p>
+                          )}
                           {idx === ride.route.length - 1 && (
-                            <p className="text-xs text-gray-500">Drop</p>
+                            <p className="text-xs text-gray-500">
+                              {ride.bookingDropLocation
+                                ? "Captain Destination"
+                                : "Drop"}
+                            </p>
                           )}
                         </div>
                       </div>
                     ))}
+                    {ride.bookingDropLocation && ride.dropPoint && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Remaining route:{" "}
+                        {getShortCity(ride.bookingDropLocation)} {"->"}{" "}
+                        {getShortCity(ride.dropPoint)}
+                      </p>
+                    )}
                   </div>
                 )}
               </>
@@ -287,15 +385,9 @@ export default function RideCard({
                   onDecline={onDeclineBooking}
                   onStart={onStartBooking}
                   onComplete={onCompleteBooking}
+                  defaultDropLabel={ride.dropPoint}
                 />
               </>
-            )}
-
-            {expanded && ride.bookingOtp && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-700">
-                OTP for captain:{" "}
-                <span className="font-semibold">{ride.bookingOtp}</span>
-              </div>
             )}
 
             {expanded && showPaymentDetails && (
