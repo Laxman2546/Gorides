@@ -6,6 +6,7 @@ import {
   sendEmailOtp,
   verifyEmailOtp,
   getUserData,
+  updatePassword,
 } from "../controller/authController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 const router = express.Router();
@@ -16,4 +17,5 @@ router.get("/api/logout", logoutUser);
 router.post("/api/sendotp", sendEmailOtp);
 router.post("/api/verifyotp", verifyEmailOtp);
 router.get("/api/getuser", authMiddleware, getUserData);
+router.post("/api/updatepassword", updatePassword);
 export default router;

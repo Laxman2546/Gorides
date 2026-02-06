@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
 import captianModel from "../models/captainModel.js";
-
+import { createEmailTemplate } from "../utilis/createTemplate.js";
 const isProd = process.env.NODE_ENV === "production";
 const baseCookieOptions = {
   httpOnly: true,
@@ -18,7 +18,6 @@ export const createUser = async (req, res) => {
     return res.status(400).json({ error: "all fields are required" });
   }
   try {
-    console.log(emailid);
     const isExisted = await userModel.findOne({ emailid });
     if (isExisted) {
       return res.status(400).json({ error: "user already existed" });
@@ -94,7 +93,7 @@ export const logoutUser = async (req, res) => {
 };
 
 export const sendEmailOtp = async (req, res) => {
-  const { emailid } = req.body;
+  const { emailid, type } = req.body;
   try {
     const user = await userModel.findOne({ emailid });
     if (!user) {
@@ -106,9 +105,14 @@ export const sendEmailOtp = async (req, res) => {
     user.emailOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
-    const subject = "Your OTP for Email Verification";
-    const text = `Your OTP is: ${otp}. It will expire in 10 minutes.`;
-    await sendEmail(user.emailid, subject, text);
+    const isForgotPassword = type !== undefined;
+    const subject = isForgotPassword
+      ? "Your OTP for Password Reset"
+      : "Your OTP for Email Verification";
+
+    const htmlBody = createEmailTemplate(otp, isForgotPassword, user);
+
+    await sendEmail(user.emailid, subject, htmlBody);
 
     res.status(200).json({ message: "OTP sent to your email address." });
   } catch (error) {
@@ -169,5 +173,33 @@ export const getUserData = async (req, res) => {
   } catch (e) {
     console.log(e, "error while getting user data");
     return res.status(500).json({ error: "error while getting user data" });
+  }
+};
+
+export const updatePassword = async (req, res) => {
+  const { newPassword, emailId } = req.body;
+  if (!newPassword) {
+    return res.status(400).json({ error: "new password is required" });
+  }
+  try {
+    const user = await userModel.findOne({ emailid: emailId });
+    if (!user) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await userModel.findOneAndUpdate(
+      { emailid: emailId },
+      {
+        $set: {
+          password: hashedPassword,
+        },
+      },
+    );
+    await user.save();
+    return res.status(200).json({ message: "password updated successfully" });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ error: "error while updating user password" });
   }
 };

@@ -25,13 +25,15 @@ const ForgotPassword = () => {
 
     try {
       setLoading(true);
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/auth/api/send-otp`, {
-        email: form.email,
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/auth/api/sendotp`, {
+        emailid: form.email,
+        type: "forgot",
       });
 
       toast.success("OTP sent to your email");
       setStep(2);
     } catch (err) {
+      console.log(err.response);
       toast.error(err.response?.data?.detail || "Failed to send OTP");
     } finally {
       setLoading(false);
@@ -44,10 +46,13 @@ const ForgotPassword = () => {
 
     try {
       setLoading(true);
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/auth/api/verify-otp`, {
-        email: form.email,
-        otp: form.otp,
-      });
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/verifyotp`,
+        {
+          emailid: form.email,
+          otp: form.otp,
+        },
+      );
 
       toast.success("OTP verified");
       setStep(3);
@@ -60,6 +65,7 @@ const ForgotPassword = () => {
 
   // ✅ Reset Password
   const changePassword = async () => {
+    console.log(form.newPassword, form.confirmPassword);
     if (form.newPassword !== form.confirmPassword) {
       return toast.error("Passwords do not match");
     }
@@ -67,10 +73,10 @@ const ForgotPassword = () => {
     try {
       setLoading(true);
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/auth/api/reset-password`,
+        `${import.meta.env.VITE_BACKEND_URL}/auth/api/updatepassword`,
         {
-          email: form.email,
-          password: form.newPassword,
+          emailId: form.email,
+          newPassword: form.newPassword,
         },
       );
 
@@ -78,6 +84,7 @@ const ForgotPassword = () => {
 
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
+      console.log(err.response);
       toast.error(err.response?.data?.detail || "Failed to reset password");
     } finally {
       setLoading(false);
@@ -89,9 +96,7 @@ const ForgotPassword = () => {
       <ToastContainer />
 
       <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-lg border">
-        <h2 className="text-3xl font-bold text-center mb-6">
-          Forgot Password
-        </h2>
+        <h2 className="text-3xl font-bold text-center mb-6">Forgot Password</h2>
 
         {step === 1 && (
           <>
