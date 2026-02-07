@@ -386,6 +386,45 @@ export const acceptBooking = async (req, res) => {
       );
     }
     await ride.save();
+    if (
+      ride.seats === 1 &&
+      booking.dropLocation &&
+      String(booking.dropLocation).trim().toLowerCase() !==
+        String(ride.destination || "").trim().toLowerCase()
+    ) {
+      const remainderDistanceData = await getDistanceTime(
+        booking.dropLocation,
+        ride.destination,
+      );
+      if (!remainderDistanceData?.error) {
+        const remainderDistanceKm = parseDistanceKm(
+          remainderDistanceData.distance,
+        );
+        const remainderDurationMin = parseDurationMinutes(
+          remainderDistanceData.duration,
+        );
+        const { price: remainderPrice, baseFare: remainderFare } =
+          calculatePrice(remainderDistanceKm, remainderDurationMin);
+        const now = new Date();
+        const remainderMinutes = Math.max(1, Math.round(remainderDurationMin));
+        const startAt = new Date(now.getTime() + remainderMinutes * 60 * 1000);
+        const remainderDate = startAt.toISOString().slice(0, 10);
+        const remainderTime = startAt.toTimeString().slice(0, 5);
+        await ridesModel.create({
+          captainId: ride.captainId,
+          pickuppoint: booking.dropLocation,
+          destination: ride.destination,
+          time: remainderTime,
+          date: remainderDate,
+          seats: 1,
+          bookedSeats: 0,
+          price: remainderPrice,
+          distance: remainderDistanceKm,
+          duration: remainderDurationMin,
+          fare: remainderFare,
+        });
+      }
+    }
     return res.status(200).json({ message: "booking accepted", booking });
   } catch (e) {
     console.log(e, "error while accepting booking");
@@ -458,45 +497,6 @@ export const completeBooking = async (req, res) => {
     booking.status = "completed";
     booking.paymentStatus = "pending";
     await ride.save();
-    if (
-      ride.seats === 1 &&
-      booking.dropLocation &&
-      String(booking.dropLocation).trim().toLowerCase() !==
-        String(ride.destination || "").trim().toLowerCase()
-    ) {
-      const remainderDistanceData = await getDistanceTime(
-        booking.dropLocation,
-        ride.destination,
-      );
-      if (!remainderDistanceData?.error) {
-        const remainderDistanceKm = parseDistanceKm(
-          remainderDistanceData.distance,
-        );
-        const remainderDurationMin = parseDurationMinutes(
-          remainderDistanceData.duration,
-        );
-        const { price: remainderPrice, baseFare: remainderFare } =
-          calculatePrice(remainderDistanceKm, remainderDurationMin);
-        const now = new Date();
-        const remainderMinutes = Math.max(1, Math.round(remainderDurationMin));
-        const startAt = new Date(now.getTime() + remainderMinutes * 60 * 1000);
-        const remainderDate = startAt.toISOString().slice(0, 10);
-        const remainderTime = startAt.toTimeString().slice(0, 5);
-        await ridesModel.create({
-          captainId: ride.captainId,
-          pickuppoint: booking.dropLocation,
-          destination: ride.destination,
-          time: remainderTime,
-          date: remainderDate,
-          seats: 1,
-          bookedSeats: 0,
-          price: remainderPrice,
-          distance: remainderDistanceKm,
-          duration: remainderDurationMin,
-          fare: remainderFare,
-        });
-      }
-    }
     return res.status(200).json({ message: "ride completed", booking });
   } catch (e) {
     console.log(e, "error while completing ride");
