@@ -6,6 +6,7 @@ import mapsRoute from "./src/routes/mapsRoute.js";
 import adminRoute from "./src/routes/adminRoute.js";
 import captainRoute from "./src/routes/captainRoute.js";
 import ridesRoute from "./src/routes/Rides.Route.js";
+import supportRoute from "./src/routes/supportRoute.js";
 import { connectDb } from "./src/config/db.js";
 import cookieParser from "cookie-parser";
 
@@ -47,6 +48,7 @@ app.use("/maps", mapsRoute);
 app.use("/admin", adminRoute);
 app.use("/captain", captainRoute);
 app.use("/rides", ridesRoute);
+app.use("/support", supportRoute);
 app.get("/wakeup", (req, res) => {
   res.send("server is wakeup");
 });

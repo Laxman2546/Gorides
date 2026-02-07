@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useJsApiLoader } from "@react-google-maps/api";
-import { LogOut } from "lucide-react";
+import { LogOut, MessageCircleQuestionMark } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { all } from "axios";
 import {
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import RideCard from "../components/RideCard.jsx";
+import HelpChatPanel from "../components/HelpChatPanel.jsx";
 
 function debounce(func, wait) {
   let timeout;
@@ -54,6 +55,7 @@ export default function GoRidesLanding() {
   const [mode, setMode] = useState("find");
   const [activeTab, setActiveTab] = useState("upcoming");
   const [showProfile, setShowProfile] = useState(false);
+  const [showHelpChat, setShowHelpChat] = useState(false);
 
   // MAP EXPAND STATE
   const [expandedRide, setExpandedRide] = useState(null);
@@ -836,13 +838,29 @@ export default function GoRidesLanding() {
                 Go<span className="text-emerald-500">Rides</span>
               </span>
             </button>
-
-            <button
-              onClick={() => setShowProfile(true)}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <User size={20} className="text-gray-700" />
-            </button>
+            <div className="flex flex-row gap-5">
+              <button
+                onClick={() => {
+                  setShowHelpChat(true);
+                  setShowProfile(false);
+                }}
+                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              >
+                <MessageCircleQuestionMark
+                  size={20}
+                  className="text-gray-700"
+                />
+              </button>
+              <button
+                onClick={() => {
+                  setShowProfile(true);
+                  setShowHelpChat(false);
+                }}
+                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              >
+                <User size={20} className="text-gray-700" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1166,6 +1184,11 @@ export default function GoRidesLanding() {
             </div>
           </>
         )}
+
+        <HelpChatPanel
+          open={showHelpChat}
+          onClose={() => setShowHelpChat(false)}
+        />
 
         {showProfile && (
           <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm">
