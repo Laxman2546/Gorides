@@ -1,29 +1,40 @@
-import React, { useEffect, useRef, useState } from "react";
-import { GoogleMap, Marker, Polyline } from "@react-google-maps/api";
+import React, { useEffect, useState } from "react";
+import {
+  GoogleMap,
+  DirectionsService,
+  DirectionsRenderer,
+} from "@react-google-maps/api";
 import { Navigation } from "lucide-react";
 
-export default function RideRouteMap({ ride, isLoaded, buildRoute }) {
-  const [points, setPoints] = useState([]);
-  const mapRef = useRef(null);
+export default function RideRouteMap({ ride, isLoaded }) {
+  const [directions, setDirections] = useState(null);
+  const [directionsOptions, setDirectionsOptions] = useState(null);
 
   useEffect(() => {
-    let mounted = true;
-    const loadRoute = async () => {
-      const routePoints = await buildRoute(ride);
-      if (mounted) setPoints(routePoints);
-    };
-    loadRoute();
-    return () => {
-      mounted = false;
-    };
-  }, [ride, buildRoute]);
+    if (!ride || !ride.route || ride.route.length < 2) {
+      return;
+    }
 
-  const onLoad = (map) => {
-    mapRef.current = map;
-    if (points.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds();
-      points.forEach((p) => bounds.extend(p));
-      map.fitBounds(bounds);
+    const origin = ride.route[0];
+    const destination = ride.route[ride.route.length - 1];
+    const waypoints = ride.route.slice(1, -1).map((location) => ({
+      location,
+      stopover: true,
+    }));
+
+    setDirectionsOptions({
+      origin,
+      destination,
+      waypoints,
+      travelMode: window.google.maps.TravelMode.DRIVING,
+    });
+  }, [ride]);
+
+  const directionsCallback = (response, status) => {
+    if (status === "OK" && response) {
+      setDirections(response);
+    } else {
+      console.error(`Directions request failed due to ${status}`);
     }
   };
 
@@ -43,10 +54,9 @@ export default function RideRouteMap({ ride, isLoaded, buildRoute }) {
   return (
     <div className="w-full h-[220px] rounded-xl overflow-hidden border border-gray-200">
       <GoogleMap
-        onLoad={onLoad}
         mapContainerStyle={{ width: "100%", height: "100%" }}
-        zoom={12}
-        center={points[0] || { lat: 17.385, lng: 78.4867 }}
+        zoom={6}
+        center={{ lat: 17.385, lng: 78.4867 }} // Default center
         options={{
           zoomControl: false,
           streetViewControl: false,
@@ -54,41 +64,22 @@ export default function RideRouteMap({ ride, isLoaded, buildRoute }) {
           fullscreenControl: false,
         }}
       >
-        {points.map((p, i) => (
-          <Marker
-            key={i}
-            position={p}
-            icon={
-              i === 0
-                ? {
-                    path: window.google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#10b981",
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2,
-                  }
-                : i === points.length - 1
-                  ? {
-                      path: window.google.maps.SymbolPath.CIRCLE,
-                      scale: 8,
-                      fillColor: "#ef4444",
-                      fillOpacity: 1,
-                      strokeColor: "#ffffff",
-                      strokeWeight: 2,
-                    }
-                  : undefined
-            }
+        {directionsOptions && !directions && (
+          <DirectionsService
+            options={directionsOptions}
+            callback={directionsCallback}
           />
-        ))}
-
-        {points.length > 1 && (
-          <Polyline
-            path={points}
+        )}
+        {directions && (
+          <DirectionsRenderer
             options={{
-              strokeColor: "#10b981",
-              strokeOpacity: 1,
-              strokeWeight: 4,
+              directions,
+              suppressMarkers: false, // Set to true if you want to use custom markers
+              polylineOptions: {
+                strokeColor: "#10b981",
+                strokeOpacity: 1,
+                strokeWeight: 4,
+              },
             }}
           />
         )}
