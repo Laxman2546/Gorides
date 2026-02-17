@@ -13,6 +13,8 @@ const ForgotPassword = () => {
     confirmPassword: "",
   });
 
+  
+
   const navigate = useNavigate();
 
   const handleChange = (e) => {
