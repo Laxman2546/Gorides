@@ -47,7 +47,6 @@ const loadRazorpayScript = () =>
     document.body.appendChild(script);
   });
 
-const GOOGLE_MAPS_KEY = "AIzaSyD92ayKlcL87JfAN771lykAN47g8Hy4Bx8";
 const GOOGLE_MAPS_LIBRARIES = ["places"];
 
 export default function GoRidesLanding() {
@@ -98,7 +97,7 @@ export default function GoRidesLanding() {
 
   // GOOGLE MAPS LOADER
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_KEY,
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API,
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
@@ -117,7 +116,7 @@ export default function GoRidesLanding() {
       const res = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
           city,
-        )}&key=${GOOGLE_MAPS_KEY}`,
+        )}&key=${import.meta.env.VITE_GOOGLE_MAPS_API}`,
       );
       const data = await res.json();
       const location = data.results?.[0]?.geometry?.location;
@@ -758,7 +757,6 @@ export default function GoRidesLanding() {
           withCredentials: true,
         },
       );
-      console.log(response.data);
       toast.success("Captain created successfully,will be verified soon");
       getUserData();
     } catch (e) {
