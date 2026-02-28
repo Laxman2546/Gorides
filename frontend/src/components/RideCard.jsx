@@ -21,7 +21,6 @@ export default function RideCard({
   onCompleteBooking,
   captainBookings,
   isLoaded,
-  buildRoute,
   getShortCity,
   userLocation,
   locationError,
@@ -320,7 +319,6 @@ export default function RideCard({
                   <RideRouteMap
                     ride={ride}
                     isLoaded={isLoaded}
-                    buildRoute={buildRoute}
                   />
                 )}
 

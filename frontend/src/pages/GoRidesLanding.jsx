@@ -95,14 +95,7 @@ export default function GoRidesLanding() {
               <Car className="text-white" size={24} />
             </div>
             <h1 className="text-xl md:text-3xl font-bold">
-              <span
-                className={
-                  scrolled ? "text-gray-900" : "text-white drop-shadow-lg"
-                }
-              >
-                Go
-              </span>
-              <span className="text-emerald-500">Rides</span>
+              <span className="text-emerald-500">Velura</span>
             </h1>
           </button>
 

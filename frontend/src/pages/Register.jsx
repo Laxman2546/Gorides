@@ -208,7 +208,7 @@ const Register = () => {
                     />
                     <button
                       type="button"
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-4 top-1/2 transform-translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       onClick={toggleConfirm}
                     >
                       {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}

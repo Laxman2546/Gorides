@@ -142,9 +142,9 @@ export default function GoRidesLanding() {
 
   const formatPrice = (value) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
-      return "₹--";
+      return "Γé╣--";
     }
-    return `₹${Number(value).toFixed(0)}`;
+    return `Γé╣${Number(value).toFixed(0)}`;
   };
 
   const normalizeRide = (ride, options = {}) => {
